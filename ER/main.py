@@ -13,6 +13,7 @@ import torch.optim.lr_scheduler as lr_scheduler
 from dataloaders.make_buffer import set_buffer
 from dataloaders.make_dataloader import set_loader
 from trains.main_train import train
+from preprocesses.main_preprocess import pre_process
 from postprocesses.main_postprocess import post_process
 
 
@@ -124,6 +125,8 @@ def make_setup(opt):
 
     from dataloaders.make_dataloader import set_loader
 
+    method_tools = {}
+
     # 手法毎にモデル構造，損失関数，最適化手法，スケジューラを作成
     if opt.method == "er":
 
@@ -175,6 +178,8 @@ def make_setup(opt):
                               lr=opt.learning_rate,
                               momentum=opt.momentum,
                               weight_decay=opt.weight_decay)
+        
+        method_tools = {"feature_list": [], "threshold": None, "feature_mat": []}
 
     else:
         assert False
@@ -186,7 +191,7 @@ def make_setup(opt):
         if model2 is not None:
             model2 = model2.cuda()
     
-    return model, model2, criterion, optimizer
+    return model, model2, criterion, optimizer, method_tools
 
 
 def make_scheduler(opt, optimizer, epochs, dataloader):
@@ -223,7 +228,7 @@ def main():
     logging.info("Experiment started")
 
     # modelの作成，損失関数の作成，Optimizerの作成
-    model, model2, criterion, optimizer = make_setup(opt)
+    model, model2, criterion, optimizer, method_tools = make_setup(opt)
 
     # バッファ内データのインデックス
     replay_indices = None
@@ -267,6 +272,8 @@ def main():
         # schedulerの作成
         scheduler = make_scheduler(opt=opt, epochs=opt.epochs, optimizer=optimizer, dataloader=dataloader["train"])
 
+        # タスク開始後の前処理（gpmなどの前処理が必要な手法のため）
+        method_tools = pre_process(opt=opt, model=model, dataloader=dataloader, method_tools=method_tools)
 
         # 訓練を実行
         for epoch in range(1, opt.epochs+1):
@@ -274,10 +281,10 @@ def main():
             # 学習 & 検証
             train(opt=opt, model=model, model2=model2, criterion=criterion,
                   optimizer=optimizer, scheduler=scheduler, dataloader=dataloader,
-                  epoch=epoch)
+                  epoch=epoch, method_tools=method_tools)
             
         # タスク終了後の後処理（gpmなどの後処理が必要な手法のため）
-        post_process(opt=opt, model=model, dataloader=dataloader)
+        method_tools = post_process(opt=opt, model=model, dataloader=dataloader, method_tools=method_tools)
             
 
 

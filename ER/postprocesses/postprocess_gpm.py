@@ -26,7 +26,7 @@ def get_representation_matrix_ResNet18(opt, model, vanilla_loader):
             if torch.cuda.is_available():
                 images = images.cuda(non_blocking=True)
                 labels = labels.cuda(non_blocking=True)
-            
+                        
             
             # これで，model.actに各層の活性化マップが保持される
             example_out  = model(images)
@@ -128,14 +128,88 @@ def get_representation_matrix_ResNet18(opt, model, vanilla_loader):
     return mat_final
 
 
-def postprocess_gpm(opt, model, vanilla_loader):
+def update_GPM (model, mat_list, threshold, feature_list=[],):
+    print ('Threshold: ', threshold) 
+
+    if not feature_list:
+        # After First Task 
+        for i in range(len(mat_list)):
+
+            # print("i: ", i)
+
+            activation = mat_list[i]
+            # print("activation.shape: ", activation.shape)  # activation.shape:  (27, 51200)    l=1
+            #                                                # activation.shape:  (180, 51200)   l=2
+            
+            U,S,Vh = np.linalg.svd(activation, full_matrices=False)
+            # print("U.shape: ", U.shape)     # U.shape:  (27, 27)
+            #                                 # U.shape:  (180, 180)
+            # print("S.shape: ", S.shape)     # S.shape:  (27,)
+            #                                 # S.shape:  (180,)
+            # print("Vh.shape: ", Vh.shape)   # Vh.shape:  (27, 51200)
+            #                                 # Vh.shape:  (180, 51200)
+
+            # criteria (Eq-5)
+            sval_total = (S**2).sum()
+            sval_ratio = (S**2)/sval_total
+            r = np.sum(np.cumsum(sval_ratio)<threshold[i]) #+1  
+            feature_list.append(U[:,0:r])
+    
+    else:
+        for i in range(len(mat_list)):
+            
+            activation = mat_list[i]
+            U1,S1,Vh1=np.linalg.svd(activation, full_matrices=False)
+            sval_total = (S1**2).sum()
+            
+            # Projected Representation (Eq-8)
+            act_hat = activation - np.dot(np.dot(feature_list[i],feature_list[i].transpose()),activation)
+            U,S,Vh = np.linalg.svd(act_hat, full_matrices=False)
+            
+            # criteria (Eq-9)
+            sval_hat = (S**2).sum()
+            sval_ratio = (S**2)/sval_total               
+            accumulated_sval = (sval_total-sval_hat)/sval_total
+
+            r = 0
+            for ii in range (sval_ratio.shape[0]):
+                if accumulated_sval < threshold[i]:
+                    accumulated_sval += sval_ratio[ii]
+                    r += 1
+                else:
+                    break
+            if r == 0:
+                print ('Skip Updating GPM for layer: {}'.format(i+1)) 
+                continue
+
+            # update GPM
+            Ui=np.hstack((feature_list[i],U[:,0:r]))  
+            if Ui.shape[1] > Ui.shape[0] :
+                feature_list[i]=Ui[:,0:Ui.shape[0]]
+            else:
+                feature_list[i]=Ui
+    
+
+    print('-'*40)
+    print('Gradient Constraints Summary')
+    print('-'*40)
+    for i in range(len(feature_list)):
+        print ('Layer {} : {}/{}'.format(i+1,feature_list[i].shape[1], feature_list[i].shape[0]))
+    print('-'*40)
+    return feature_list  
+
+
+def postprocess_gpm(opt, model, vanilla_loader, feature_list, threshold):
 
     # 特徴行列の取得
     mat_list = get_representation_matrix_ResNet18(opt, model, vanilla_loader)
     # print("torch.tensor(mat_list).shape: ", torch.tensor(mat_list).shape)
-    assert False
 
-    # 
+    # mat_listに基づいて
+    feature_list = update_GPM(model=model, mat_list=mat_list, threshold=threshold, feature_list=feature_list)
+
+    return feature_list
+
 
 
 
