@@ -22,7 +22,8 @@ def parse_option():
     parser = argparse.ArgumentParser('argument for training')
 
     # 手法
-    parser.add_argument('--method', type=str, default="")
+    parser.add_argument('--method', type=str, default="",
+                        choices=['er', 'co2l', 'gpm', 'lucir'])
 
     # logの名前（実行毎に変えてね）
     parser.add_argument('--log_name', type=str, default="practice")
@@ -55,7 +56,8 @@ def parse_option():
 
     # 継続学習的設定
     parser.add_argument('--mem_size', type=int, default=500)
-    parser.add_argument('--mem_type', type=str, default="ring")
+    parser.add_argument('--mem_type', type=str, default="ring",
+                        choices=["reservoir", "ring", "herding"])
 
     # 手法毎のハイパラ（共通）
     parser.add_argument("--temp", type=float, default=2)
@@ -65,6 +67,11 @@ def parse_option():
     parser.add_argument('--current_temp', type=float, default=0.2)
     parser.add_argument('--past_temp', type=float, default=0.1)
     parser.add_argument('--distill_power', type=float, default=0.1)
+
+    # 手法毎のハイパラ（lucir）
+    parser.add_argument("--K", type=int, default=2)
+    parser.add_argument("--dist", type=float, default=0.5)
+    parser.add_argument("--lw_mr", type=float, default=1)
 
     # その他の条件
     parser.add_argument('--print_freq', type=int, default=20)
@@ -195,7 +202,7 @@ def make_setup(opt):
         model = BackboneResNet(name='resnet18', head='linear', feat_dim=opt.cls_per_task)
         print("model: ", model)
 
-        model2 = None
+        model2 = BackboneResNet(name='resnet18', head='linear', feat_dim=opt.cls_per_task)
         criterion = torch.nn.CrossEntropyLoss()
         optimizer = optim.SGD(model.parameters(),
                               lr=opt.learning_rate,

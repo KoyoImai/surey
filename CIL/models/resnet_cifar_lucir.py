@@ -256,7 +256,7 @@ class BackboneResNet(nn.Module):
     def forward(self, x, return_feat=False, norm=True):
         encoded = self.encoder(x)
         
-        feat = self.head(encoded)
+        feat = self.head(encoded)   # headの出力なのでlinearなら分類層の出力です
         
         if return_feat:
             return feat, encoded

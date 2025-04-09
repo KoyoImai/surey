@@ -99,3 +99,24 @@ def val_er(opt, model, model2, criterion, optimizer, scheduler, train_loader, va
     classil_acc = np.sum(corr)/np.sum(cnt)*100.
     taskil_acc = correct_task/np.sum(cnt)*100.
     return classil_acc, taskil_acc
+
+
+
+
+def ncm_er(model, ncm_loader, val_loader):
+
+    # modelを評価モードに変更
+    model.eval()
+
+    # 平均特徴の計算
+    for idx, (images, labels) in enumerate(ncm_loader):
+
+        # gpu上に配置
+        if torch.cuda.is_available():
+            images = images.cuda(non_blocking=True)
+            labels = labels.cuda(non_blocking=True)
+        
+        
+
+
+    return None

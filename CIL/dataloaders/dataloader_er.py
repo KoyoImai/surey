@@ -111,6 +111,44 @@ def set_vanillaloader_er_cifar10(opt, normalize):
     return train_loader, subset_indices
 
 
+# NCM分類用cifar10
+def set_ncmloader_er_cifar10(opt, normalize, replay_indices):
+
+    train_transform = transforms.Compose([
+        transforms.Resize(size=(opt.size, opt.size)),
+        transforms.ToTensor(),
+        normalize,
+    ])
+
+    # 現在タスクのクラス
+    target_classes = list(range(opt.target_task*opt.cls_per_task, (opt.target_task+1)*opt.cls_per_task))
+    print(target_classes)
+
+    subset_indices = []
+    _train_dataset = datasets.CIFAR10(root=opt.data_folder,
+                                        transform=train_transform,
+                                        download=True)
+    for tc in target_classes:
+        target_class_indices = np.where(np.array(_train_dataset.targets) == tc)[0]
+        subset_indices += np.where(np.array(_train_dataset.targets) == tc)[0].tolist()
+
+    print("replay_indices: ", replay_indices)
+    subset_indices += replay_indices
+
+    train_dataset =  Subset(_train_dataset, subset_indices)
+    print('Dataset size: {}'.format(len(subset_indices)))
+    uk, uc = np.unique(np.array(_train_dataset.targets)[subset_indices], return_counts=True)
+    print(uc[np.argsort(uk)])
+
+    train_sampler = None
+    train_loader = torch.utils.data.DataLoader(
+        train_dataset, batch_size=500, shuffle=False,
+        num_workers=opt.num_workers, pin_memory=True)
+
+    return train_loader, subset_indices
+
+
+
 # 訓練用cifar100
 def set_loader_er_cifar100(opt, normalize, replay_indices):
 
@@ -219,6 +257,47 @@ def set_vanillaloader_er_cifar100(opt, normalize):
     return train_loader, subset_indices
 
 
+# NCM分類用cifar100
+def set_ncmloader_er_cifar100(opt, normalize, replay_indices):
+
+    print("replay_indices: ", replay_indices)
+
+    train_transform = transforms.Compose([
+        transforms.Resize(size=(opt.size, opt.size)),
+        transforms.ToTensor(),
+        normalize,
+    ])
+
+    # 現在タスクのクラス
+    target_classes = list(range(opt.target_task*opt.cls_per_task, (opt.target_task+1)*opt.cls_per_task))
+    print(target_classes)
+
+    subset_indices = []
+    _train_dataset = datasets.CIFAR100(root=opt.data_folder,
+                                        transform=train_transform,
+                                        download=True)
+    for tc in target_classes:
+        target_class_indices = np.where(np.array(_train_dataset.targets) == tc)[0]
+        subset_indices += np.where(np.array(_train_dataset.targets) == tc)[0].tolist()
+
+    subset_indices += replay_indices
+
+    train_dataset =  Subset(_train_dataset, subset_indices)
+    print('Dataset size: {}'.format(len(subset_indices)))
+    uk, uc = np.unique(np.array(_train_dataset.targets)[subset_indices], return_counts=True)
+    print(uc[np.argsort(uk)])
+
+
+    train_sampler = None
+    train_loader = torch.utils.data.DataLoader(
+        train_dataset, batch_size=500, shuffle=False,
+        num_workers=opt.num_workers, pin_memory=True)
+
+    return train_loader, subset_indices
+
+
+
+
 # 訓練用tiny-imagenet
 def set_loader_er_tinyimagenet(opt, normalize, replay_indices):
 
@@ -325,3 +404,38 @@ def set_vanillaloader_er_tinyimagenet(opt, normalize):
     return train_loader, subset_indices
 
 
+# NCM分類用tiny-imagenet
+def set_ncmloader_er_tinyimagenet(opt, normalize, replay_indices):
+
+    train_transform = transforms.Compose([
+        transforms.Resize(size=(opt.size, opt.size)),
+        transforms.ToTensor(),
+        normalize,
+    ])
+
+    # 現在タスクのクラス
+    target_classes = list(range(opt.target_task*opt.cls_per_task, (opt.target_task+1)*opt.cls_per_task))
+    print(target_classes)
+
+    subset_indices = []
+
+    _train_dataset = TinyImagenet(root=opt.data_folder,
+                                  transform=train_transform,
+                                  download=True)
+    for tc in target_classes:
+        target_class_indices = np.where(_train_dataset.targets == tc)[0]
+        subset_indices += np.where(_train_dataset.targets == tc)[0].tolist()
+
+    subset_indices += replay_indices
+
+    train_dataset =  Subset(_train_dataset, subset_indices)
+    print('Dataset size: {}'.format(len(subset_indices)))
+    uk, uc = np.unique(np.array(_train_dataset.targets)[subset_indices], return_counts=True)
+    print(uc[np.argsort(uk)])
+
+    train_sampler = None
+    train_loader = torch.utils.data.DataLoader(
+        train_dataset, batch_size=500, shuffle=False,
+        num_workers=opt.num_workers, pin_memory=True)
+
+    return train_loader, subset_indices
