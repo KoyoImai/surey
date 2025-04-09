@@ -22,6 +22,10 @@ import argparse,time
 import math
 from copy import deepcopy
 
+from util import seed_everything
+
+
+
 ## Define ResNet18 model
 def compute_conv_output_size(Lin,kernel_size,stride=1,padding=0,dilation=1):
     return int(np.floor((Lin+2*padding-dilation*(kernel_size-1)-1)/float(stride)+1))
@@ -69,8 +73,10 @@ class BasicBlock(nn.Module):
         return out
 
 class ResNet(nn.Module):
-    def __init__(self, block, num_blocks, nf=64, nclass=100, zero_init_residual=False):
+    def __init__(self, block, num_blocks, nf=64, nclass=100, seed=777, zero_init_residual=False):
         super(ResNet, self).__init__()
+        
+        seed_everything(seed=seed)
         
         self.in_planes = nf
 
@@ -128,8 +134,8 @@ class ResNet(nn.Module):
 
     
 
-def ResNet18(nf=32, nclass=100):
-    return ResNet(BasicBlock, [2, 2, 2, 2], nf, nclass)
+def ResNet18(nf=32, nclass=100, seed=777):
+    return ResNet(BasicBlock, [2, 2, 2, 2], nf, nclass, seed)
 
 
 

@@ -89,9 +89,9 @@ def train_lucir(opt, model, model2, criterion, optimizer, scheduler, train_loade
             loss2 = criterion(y_pred, labels)
 
             # マージンランキング損失
-            print("y_pred.sahpe: ", y_pred.shape)
-            print("old_scores.shape: ", old_scores.shape)
-            print("new_scores.shape: ", new_scores.shape)
+            # print("y_pred.sahpe: ", y_pred.shape)
+            # print("old_scores.shape: ", old_scores.shape)
+            # print("new_scores.shape: ", new_scores.shape)
             outputs_bs = torch.cat((old_scores, new_scores), dim=1)
             assert(outputs_bs.size()==y_pred.size())
 
@@ -143,7 +143,7 @@ def train_lucir(opt, model, model2, criterion, optimizer, scheduler, train_loade
                     'loss2 {loss2:.3f}\t'
                     'loss3 {loss3:.3f}\t'
                     'acc {correct:.3f}'.format(
-                    epoch, idx + 1, len(train_loader), loss=losses, correct=100.*correct/total, loss1=loss1, loss2=loss2, loss3=loss3))
+                    epoch, idx + 1, len(train_loader), loss=losses, correct=100.*correct/total, loss1=loss1.item(), loss2=loss2.item(), loss3=loss3.item()))
         else:
             if (idx+1) % opt.print_freq == 0 or idx+1 == len(train_loader):
                 print('Train: [{0}][{1}/{2}]\t'
@@ -304,7 +304,7 @@ def ncm_lucir(model, ncm_loader, val_loader):
     # print("NCM Classification Accuracy: {:.2f}%".format(ncm_acc))
 
 
-    return None
+    return ncm_acc
 
 
 

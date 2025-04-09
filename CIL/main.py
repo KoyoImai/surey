@@ -1,4 +1,5 @@
 import os
+import random
 import argparse
 import numpy as np
 import logging
@@ -10,6 +11,8 @@ from torchvision import transforms, datasets
 from torch.utils.data import Subset, Dataset
 import torch.optim.lr_scheduler as lr_scheduler
 
+
+from util import seed_everything
 from dataloaders.make_buffer import set_buffer
 from dataloaders.make_dataloader import set_loader
 from trains.main_train import train
@@ -138,7 +141,7 @@ def make_setup(opt):
 
     method_tools = {}
 
-    # 手法毎にモデル構造，損失関数，最適化手法，スケジューラを作成
+    # 手法毎にモデル構造，損失関数，最適化手法を作成
     if opt.method == "er":
 
         if opt.dataset in ["cifar10", "cifar100", "tiny-imagenet"]:
@@ -146,7 +149,7 @@ def make_setup(opt):
         elif opt.dataset in ["imagemet"]:
             assert False
         
-        model = BackboneResNet(name='resnet18', head='linear', feat_dim=opt.n_cls)
+        model = BackboneResNet(name='resnet18', head='linear', feat_dim=opt.n_cls, seed=opt.seed)
         print("model: ", model)
         # assert False
         model2 = None
@@ -164,8 +167,8 @@ def make_setup(opt):
         elif opt.dataset in ["imagemet"]:
             assert False
         
-        model = SupConResNet(name='resnet18', head='mlp', feat_dim=128)
-        model2 = SupConResNet(name='resnet18', head='mlp', feat_dim=128)
+        model = SupConResNet(name='resnet18', head='mlp', feat_dim=128, seed=opt.seed)
+        model2 = SupConResNet(name='resnet18', head='mlp', feat_dim=128, seed=opt.seed)
         criterion = SupConLoss(temperature=0.07)
         optimizer = optim.SGD(model.parameters(),
                                 lr=opt.learning_rate,
@@ -179,7 +182,7 @@ def make_setup(opt):
         elif opt.dataset in ["imagemet"]:
             assert False
         
-        model = ResNet18(nf=64, nclass=opt.n_cls)
+        model = ResNet18(nf=64, nclass=opt.n_cls, seed=opt.seed)
 
         print("model: ", model)
         # assert False
@@ -199,10 +202,10 @@ def make_setup(opt):
         elif opt.dataset in ["imagemet"]:
             assert False
 
-        model = BackboneResNet(name='resnet18', head='linear', feat_dim=opt.cls_per_task)
+        model = BackboneResNet(name='resnet18', head='linear', feat_dim=opt.cls_per_task, seed=opt.seed)
         print("model: ", model)
 
-        model2 = BackboneResNet(name='resnet18', head='linear', feat_dim=opt.cls_per_task)
+        model2 = BackboneResNet(name='resnet18', head='linear', feat_dim=opt.cls_per_task, seed=opt.seed)
         criterion = torch.nn.CrossEntropyLoss()
         optimizer = optim.SGD(model.parameters(),
                               lr=opt.learning_rate,
@@ -263,8 +266,11 @@ def main():
     # コマンドライン引数の処理
     opt = parse_option()
 
+    # 乱数のシード固定（既存のコードに追加）
+    seed_everything(opt.seed)
+
     # logの名前
-    opt.log_name = f"{opt.log_name}_{opt.method}_{opt.mem_type}{opt.mem_size}_{opt.dataset}"
+    opt.log_name = f"{opt.log_name}_{opt.method}_{opt.mem_type}{opt.mem_size}_{opt.dataset}_seed{opt.seed}"
 
     # データローダ作成の前処理
     preparation(opt)
@@ -292,7 +298,7 @@ def main():
 
         # リプレイバッファ内にあるデータのインデックスを獲得
         replay_indices = set_buffer(opt, model, prev_indices=replay_indices)
-        print("main.py replay_indices: ", replay_indices)
+        # print("main.py replay_indices: ", replay_indices)
 
         # バッファ内データのインデックスを保存（検証や分析時に読み込むため）
         np.save(
@@ -330,11 +336,6 @@ def main():
             
         # タスク終了後の後処理（gpmなどの後処理が必要な手法のため）
         method_tools, model2 = post_process(opt=opt, model=model, model2=model2, dataloader=dataloader, method_tools=method_tools)
-            
-
-
-
-
 
     
 

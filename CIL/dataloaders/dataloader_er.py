@@ -35,11 +35,11 @@ def set_loader_er_cifar10(opt, normalize, replay_indices):
         target_class_indices = np.where(np.array(_train_dataset.targets) == tc)[0]
         subset_indices += np.where(np.array(_train_dataset.targets) == tc)[0].tolist()
 
-    print("replay_indices: ", replay_indices)
+    # print("replay_indices: ", replay_indices)
     subset_indices += replay_indices
 
     train_dataset =  Subset(_train_dataset, subset_indices)
-    print('Dataset size: {}'.format(len(subset_indices)))
+    # print('Dataset size: {}'.format(len(subset_indices)))
     uk, uc = np.unique(np.array(_train_dataset.targets)[subset_indices], return_counts=True)
     print(uc[np.argsort(uk)])
 
@@ -99,7 +99,7 @@ def set_vanillaloader_er_cifar10(opt, normalize):
         subset_indices += np.where(np.array(_train_dataset.targets) == tc)[0].tolist()
 
     train_dataset =  Subset(_train_dataset, subset_indices)
-    print('Dataset size: {}'.format(len(subset_indices)))
+    # print('Dataset size: {}'.format(len(subset_indices)))
     uk, uc = np.unique(np.array(_train_dataset.targets)[subset_indices], return_counts=True)
     print(uc[np.argsort(uk)])
 
@@ -132,11 +132,11 @@ def set_ncmloader_er_cifar10(opt, normalize, replay_indices):
         target_class_indices = np.where(np.array(_train_dataset.targets) == tc)[0]
         subset_indices += np.where(np.array(_train_dataset.targets) == tc)[0].tolist()
 
-    print("replay_indices: ", replay_indices)
+    # print("replay_indices: ", replay_indices)
     subset_indices += replay_indices
 
     train_dataset =  Subset(_train_dataset, subset_indices)
-    print('Dataset size: {}'.format(len(subset_indices)))
+    # print('Dataset size: {}'.format(len(subset_indices)))
     uk, uc = np.unique(np.array(_train_dataset.targets)[subset_indices], return_counts=True)
     print(uc[np.argsort(uk)])
 
@@ -152,7 +152,7 @@ def set_ncmloader_er_cifar10(opt, normalize, replay_indices):
 # 訓練用cifar100
 def set_loader_er_cifar100(opt, normalize, replay_indices):
 
-    print("replay_indices: ", replay_indices)
+    # print("replay_indices: ", replay_indices)
 
     train_transform = transforms.Compose([
         transforms.Resize(size=(opt.size, opt.size)),
@@ -182,7 +182,7 @@ def set_loader_er_cifar100(opt, normalize, replay_indices):
     subset_indices += replay_indices
 
     train_dataset =  Subset(_train_dataset, subset_indices)
-    print('Dataset size: {}'.format(len(subset_indices)))
+    # print('Dataset size: {}'.format(len(subset_indices)))
     uk, uc = np.unique(np.array(_train_dataset.targets)[subset_indices], return_counts=True)
     print(uc[np.argsort(uk)])
 
@@ -244,7 +244,7 @@ def set_vanillaloader_er_cifar100(opt, normalize):
         subset_indices += np.where(np.array(_train_dataset.targets) == tc)[0].tolist()
 
     train_dataset =  Subset(_train_dataset, subset_indices)
-    print('Dataset size: {}'.format(len(subset_indices)))
+    # print('Dataset size: {}'.format(len(subset_indices)))
     uk, uc = np.unique(np.array(_train_dataset.targets)[subset_indices], return_counts=True)
     print(uc[np.argsort(uk)])
 
@@ -260,7 +260,7 @@ def set_vanillaloader_er_cifar100(opt, normalize):
 # NCM分類用cifar100
 def set_ncmloader_er_cifar100(opt, normalize, replay_indices):
 
-    print("replay_indices: ", replay_indices)
+    # print("replay_indices: ", replay_indices)
 
     train_transform = transforms.Compose([
         transforms.Resize(size=(opt.size, opt.size)),
@@ -283,7 +283,7 @@ def set_ncmloader_er_cifar100(opt, normalize, replay_indices):
     subset_indices += replay_indices
 
     train_dataset =  Subset(_train_dataset, subset_indices)
-    print('Dataset size: {}'.format(len(subset_indices)))
+    # print('Dataset size: {}'.format(len(subset_indices)))
     uk, uc = np.unique(np.array(_train_dataset.targets)[subset_indices], return_counts=True)
     print(uc[np.argsort(uk)])
 
@@ -330,7 +330,7 @@ def set_loader_er_tinyimagenet(opt, normalize, replay_indices):
     subset_indices += replay_indices
 
     train_dataset =  Subset(_train_dataset, subset_indices)
-    print('Dataset size: {}'.format(len(subset_indices)))
+    # print('Dataset size: {}'.format(len(subset_indices)))
     uk, uc = np.unique(np.array(_train_dataset.targets)[subset_indices], return_counts=True)
     print(uc[np.argsort(uk)])
 
@@ -392,7 +392,7 @@ def set_vanillaloader_er_tinyimagenet(opt, normalize):
 
 
     train_dataset =  Subset(_train_dataset, subset_indices)
-    print('Dataset size: {}'.format(len(subset_indices)))
+    # print('Dataset size: {}'.format(len(subset_indices)))
     uk, uc = np.unique(np.array(_train_dataset.targets)[subset_indices], return_counts=True)
     print(uc[np.argsort(uk)])
 
@@ -429,7 +429,7 @@ def set_ncmloader_er_tinyimagenet(opt, normalize, replay_indices):
     subset_indices += replay_indices
 
     train_dataset =  Subset(_train_dataset, subset_indices)
-    print('Dataset size: {}'.format(len(subset_indices)))
+    # print('Dataset size: {}'.format(len(subset_indices)))
     uk, uc = np.unique(np.array(_train_dataset.targets)[subset_indices], return_counts=True)
     print(uc[np.argsort(uk)])
 

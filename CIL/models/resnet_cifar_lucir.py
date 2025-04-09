@@ -7,6 +7,8 @@ import torch.nn.functional as F
 
 from torch.nn.parameter import Parameter
 
+from util import seed_everything
+
 
 
 class BasicBlock(nn.Module):
@@ -224,8 +226,11 @@ class SplitCosineLinear(nn.Module):
 
 class BackboneResNet(nn.Module):
     """backbone + projection head"""
-    def __init__(self, name='resnet50', head='mlp', feat_dim=128):
+    def __init__(self, name='resnet50', head='mlp', feat_dim=128, seed=777):
         super(BackboneResNet, self).__init__()
+
+        seed_everything(seed=seed)
+        
         model_fun, dim_in = model_dict[name]
         self.encoder = model_fun()
 

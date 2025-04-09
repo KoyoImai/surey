@@ -24,7 +24,7 @@ def set_replay_samples_reservoir(opt, model, prev_indices=None):
         def __getitem__(self, idx):
             return self.indices[idx], self.dataset[idx]
 
-    # データローダの仮作成（ラベルがほしいだけ）
+    # データセットの仮作成（ラベルがほしいだけ）
     val_transform = transforms.Compose([
         transforms.ToTensor(),
     ])
@@ -35,7 +35,12 @@ def set_replay_samples_reservoir(opt, model, prev_indices=None):
                                          transform=val_transform,
                                          download=True)
         val_targets = np.array(val_dataset.targets)
-
+    elif opt.dataset == 'cifar100':
+        subset_indices = []
+        val_dataset = datasets.CIFAR100(root=opt.data_folder,
+                                         transform=val_transform,
+                                         download=True)
+        val_targets = np.array(val_dataset.targets)
     elif opt.dataset == 'tiny-imagenet':
         subset_indices = []
         val_dataset = TinyImagenet(root=opt.data_folder,
@@ -46,7 +51,7 @@ def set_replay_samples_reservoir(opt, model, prev_indices=None):
     else:
         raise ValueError('dataset not supported: {}'.format(opt.dataset))
     
-    # 
+    # 前回タスクのクラスを獲得
     if prev_indices is None:
         prev_indices = []
         observed_classes = list(range(0, opt.target_task*opt.cls_per_task))
@@ -56,7 +61,7 @@ def set_replay_samples_reservoir(opt, model, prev_indices=None):
     if len(observed_classes) == 0:
         return prev_indices
 
-    # 現在タスクのデータのインデックス獲得
+    # 前回タスクのデータのインデックス獲得
     observed_indices = []
     for tc in observed_classes:
         observed_indices += np.where(val_targets == tc)[0].tolist()
@@ -143,16 +148,17 @@ def set_replay_samples_ring(opt, model, prev_indices=None):
 
             print(np.unique(val_targets[prev_indices], return_counts=True))
 
-        # 現在タスクのクラス範囲
+        # 前回タスクのクラス範囲
         observed_classes = list(range(max(opt.target_task-1, 0)*opt.cls_per_task, (opt.target_task)*opt.cls_per_task))
     
     print("buffer_er.py observed_classes: ", observed_classes)
 
-    # これから学習するクラスのうちバッファに保存するデータのインデックスを決定
+    # 確認済みのクラス（前回タスク）がない場合終了
     if len(observed_classes) == 0:
         return prev_indices
     
 
+    # 確認済みクラスのインデックスを獲得
     observed_indices = []
     for tc in observed_classes:
         observed_indices += np.where(val_targets == tc)[0].tolist()

@@ -25,7 +25,7 @@ def set_loader_lucir_cifar10(opt, normalize, replay_indices):
 
     # 現在タスクのクラス
     target_classes = list(range(opt.target_task*opt.cls_per_task, (opt.target_task+1)*opt.cls_per_task))
-    print(target_classes)
+    # print(target_classes)
 
     subset_indices = []
     _train_dataset = datasets.CIFAR10(root=opt.data_folder,

@@ -8,6 +8,9 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from util import seed_everything
+
+
 class BasicBlock(nn.Module):
     expansion = 1
 
@@ -163,8 +166,11 @@ class LinearBatchNorm(nn.Module):
 
 class SupConResNet(nn.Module):
     """backbone + projection head"""
-    def __init__(self, name='resnet50', head='mlp', feat_dim=128):
+    def __init__(self, name='resnet50', head='mlp', feat_dim=128, seed=777):
         super(SupConResNet, self).__init__()
+
+        seed_everything(seed=seed)
+
         model_fun, dim_in = model_dict[name]
         self.encoder = model_fun()
         if head == 'linear':
