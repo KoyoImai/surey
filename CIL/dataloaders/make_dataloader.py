@@ -13,7 +13,15 @@ from dataloaders.dataloader_co2l import set_loader_co2l_cifar100, set_linearload
 from dataloaders.dataloader_co2l import set_loader_co2l_tinyimagenet, set_linearloader_co2l_tinyimagenet, set_valloader_co2l_tinyimagenet
 
 # gpm
-from dataloaders.dataloader_gpm import set_loader_gpm_cifar10
+from dataloaders.dataloader_gpm import set_loader_gpm_cifar10, set_valloader_gpm_cifar10
+from dataloaders.dataloader_gpm import set_loader_gpm_cifar100, set_valloader_gpm_cifar100
+from dataloaders.dataloader_gpm import set_loader_gpm_tinyimagenet, set_valloader_gpm_tinyimagenet
+
+
+# lucir
+from dataloaders.dataloader_lucir import set_loader_lucir_cifar10, set_valloader_lucir_cifar10
+from dataloaders.dataloader_lucir import set_loader_lucir_cifar100, set_valloader_lucir_cifar100
+from dataloaders.dataloader_lucir import set_loader_lucir_tinyimagenet, set_valloader_lucir_tinyimagenet
 
 
 
@@ -73,19 +81,42 @@ def set_loader(opt, replay_indices):
 
     elif opt.method == "gpm":
         if opt.dataset == "cifar10":
-            train_loader, subset_indices = set_loader_er_cifar10(opt=opt, normalize=normalize, replay_indices=replay_indices)
-            val_loader = set_valloader_er_cifar10(opt=opt, normalize=normalize)
+            # train_loader, subset_indices = set_loader_er_cifar10(opt=opt, normalize=normalize, replay_indices=replay_indices)
+            train_loader, subset_indices = set_loader_gpm_cifar10(opt=opt, normalize=normalize, replay_indices=replay_indices)
+            val_loader = set_valloader_gpm_cifar10(opt=opt, normalize=normalize)
             linear_loader = None
         elif opt.dataset == "cifar100":
-            train_loader, subset_indices = set_loader_er_cifar100(opt=opt, normalize=normalize, replay_indices=replay_indices)
-            val_loader = set_valloader_er_cifar100(opt=opt, normalize=normalize)
+            # train_loader, subset_indices = set_loader_er_cifar100(opt=opt, normalize=normalize, replay_indices=replay_indices)
+            train_loader, subset_indices = set_loader_gpm_cifar100(opt=opt, normalize=normalize, replay_indices=replay_indices)
+            val_loader = set_valloader_gpm_cifar100(opt=opt, normalize=normalize)
             linear_loader = None
         elif opt.dataset == "tiny-imagenet":
-            train_loader, subset_indices = set_loader_er_tinyimagenet(opt=opt, normalize=normalize, replay_indices=replay_indices)
-            val_loader = set_valloader_er_tinyimagenet(opt=opt, normalize=normalize)
+            # train_loader, subset_indices = set_loader_er_tinyimagenet(opt=opt, normalize=normalize, replay_indices=replay_indices)
+            train_loader, subset_indices = set_loader_gpm_tinyimagenet(opt=opt, normalize=normalize, replay_indices=replay_indices)
+            val_loader = set_valloader_gpm_tinyimagenet(opt=opt, normalize=normalize)
             linear_loader = None
         else:
             assert False
+    
+    elif opt.method == "lucir":
+        if opt.dataset == "cifar10":
+            train_loader, subset_indices = set_loader_lucir_cifar10(opt=opt, normalize=normalize, replay_indices=replay_indices)
+            val_loader = set_valloader_lucir_cifar10(opt=opt, normalize=normalize)
+            linear_loader = None
+        elif opt.dataset == "cifar100":
+            train_loader, subset_indices = set_loader_lucir_cifar100(opt=opt, normalize=normalize, replay_indices=replay_indices)
+            val_loader = set_valloader_lucir_cifar100(opt=opt, normalize=normalize)
+            linear_loader = None
+        elif opt.dataset == "tiny-imagenet":
+            train_loader, subset_indices = set_loader_lucir_tinyimagenet(opt=opt, normalize=normalize, replay_indices=replay_indices)
+            val_loader = set_valloader_lucir_tinyimagenet(opt=opt, normalize=normalize)
+            linear_loader = None
+        else:
+            assert False
+    
+    else:
+        assert False
+
 
     # データ拡張も特に加えていない現在タスクのデータローダ
     # （gpmのメモリ更新などで普通の画像が必要な手法用）

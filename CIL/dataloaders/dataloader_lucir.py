@@ -1,3 +1,4 @@
+# from tkinter.ttk import _Padding
 import numpy as np
 
 import torch
@@ -7,14 +8,17 @@ from torch.utils.data import Subset, Dataset
 from dataloaders.tiny_imagenets import TinyImagenet
 
 
-
 # 訓練用CIFAR10
-def set_loader_gpm_cifar10(opt, normalize, replay_indices):
+def set_loader_lucir_cifar10(opt, normalize, replay_indices):
 
     train_transform = transforms.Compose([
         transforms.Resize(size=(opt.size, opt.size)),
-        transforms.RandomResizedCrop(size=opt.size, scale=(0.1, 1.)),
         transforms.RandomHorizontalFlip(),
+        # transforms.RandomApply([
+        #     transforms.ColorJitter(0.4, 0.4, 0.4, 0.1)
+        # ], p=0.8),
+        # transforms.RandomGrayscale(p=0.2),
+        # transforms.RandomApply([transforms.GaussianBlur(kernel_size=opt.size//20*2+1, sigma=(0.1, 2.0))], p=0.5 if opt.size>32 else 0.0),
         transforms.ToTensor(),
         normalize,
     ])
@@ -31,7 +35,7 @@ def set_loader_gpm_cifar10(opt, normalize, replay_indices):
         target_class_indices = np.where(np.array(_train_dataset.targets) == tc)[0]
         subset_indices += np.where(np.array(_train_dataset.targets) == tc)[0].tolist()
 
-    print("replay_indices: ", replay_indices)
+    # print("replay_indices: ", replay_indices)
     subset_indices += replay_indices
 
     train_dataset =  Subset(_train_dataset, subset_indices)
@@ -42,13 +46,13 @@ def set_loader_gpm_cifar10(opt, normalize, replay_indices):
     train_sampler = None
     train_loader = torch.utils.data.DataLoader(
         train_dataset, batch_size=opt.batch_size, shuffle=(train_sampler is None),
-        num_workers=opt.num_workers, pin_memory=True, sampler=train_sampler, drop_last=True)
+        num_workers=opt.num_workers, pin_memory=True, sampler=train_sampler)
 
     return train_loader, subset_indices
 
 
 # 検証用cifar10
-def set_valloader_gpm_cifar10(opt, normalize):
+def set_valloader_lucir_cifar10(opt, normalize):
 
     val_transform = transforms.Compose([
         transforms.Resize(size=(opt.size, opt.size)),
@@ -74,7 +78,7 @@ def set_valloader_gpm_cifar10(opt, normalize):
 
 
 # vanilla用cifar10
-def set_vanillaloader_gpm_cifar10(opt, normalize):
+def set_vanillaloader_lucir_cifar10(opt, normalize):
 
     train_transform = transforms.Compose([
         transforms.Resize(size=(opt.size, opt.size)),
@@ -107,13 +111,14 @@ def set_vanillaloader_gpm_cifar10(opt, normalize):
     return train_loader, subset_indices
 
 
-
 # 訓練用cifar100
-def set_loader_gpm_cifar100(opt, normalize, replay_indices):
+def set_loader_lucir_cifar100(opt, normalize, replay_indices):
+
+    # print("replay_indices: ", replay_indices)
 
     train_transform = transforms.Compose([
-        transforms.Resize(size=(opt.size, opt.size)),
-        transforms.RandomResizedCrop(size=opt.size, scale=(0.1, 1.)),
+        # transforms.Resize(size=(opt.size, opt.size), padding=4),
+        transforms.RandomCrop(opt.size, padding=4),
         transforms.RandomHorizontalFlip(),
         transforms.ToTensor(),
         normalize,
@@ -142,18 +147,16 @@ def set_loader_gpm_cifar100(opt, normalize, replay_indices):
     train_sampler = None
     train_loader = torch.utils.data.DataLoader(
         train_dataset, batch_size=opt.batch_size, shuffle=(train_sampler is None),
-        num_workers=opt.num_workers, pin_memory=True, sampler=train_sampler, drop_last=True)
+        num_workers=opt.num_workers, pin_memory=True, sampler=train_sampler)
 
     return train_loader, subset_indices
 
 
 # 検証用cifar100
-def set_valloader_gpm_cifar100(opt, normalize):
+def set_valloader_lucir_cifar100(opt, normalize):
 
     train_transform = transforms.Compose([
         transforms.Resize(size=(opt.size, opt.size)),
-        # transforms.RandomResizedCrop(size=opt.size, scale=(0.1, 1.)),
-        # transforms.RandomHorizontalFlip(),
         transforms.ToTensor(),
         normalize,
     ])
@@ -170,14 +173,14 @@ def set_valloader_gpm_cifar100(opt, normalize):
     val_dataset =  Subset(_val_dataset, subset_indices)
 
     val_loader = torch.utils.data.DataLoader(
-        val_dataset, batch_size=256, shuffle=False,
-        num_workers=8, pin_memory=True)
+        val_dataset, batch_size=500, shuffle=None,
+        num_workers=opt.num_workers, pin_memory=True)
 
     return val_loader
 
 
 # vanilla用cifar100
-def set_vanillaloader_gpm_cifar100(opt, normalize, replay_indices):
+def set_vanillaloader_lucir_cifar100(opt, normalize):
 
     train_transform = transforms.Compose([
         transforms.Resize(size=(opt.size, opt.size)),
@@ -205,19 +208,24 @@ def set_vanillaloader_gpm_cifar100(opt, normalize, replay_indices):
 
     train_sampler = None
     train_loader = torch.utils.data.DataLoader(
-        train_dataset, batch_size=opt.batch_size, shuffle=(train_sampler is None),
+        train_dataset, batch_size=500, shuffle=(train_sampler is None),
         num_workers=opt.num_workers, pin_memory=True, sampler=train_sampler)
 
     return train_loader, subset_indices
 
 
 # 訓練用tiny-imagenet
-def set_loader_gpm_tinyimagenet(opt, normalize, replay_indices):
+def set_loader_lucir_tinyimagenet(opt, normalize, replay_indices):
 
     train_transform = transforms.Compose([
         transforms.Resize(size=(opt.size, opt.size)),
         transforms.RandomResizedCrop(size=opt.size, scale=(0.2, 1.)),
         transforms.RandomHorizontalFlip(),
+        # transforms.RandomApply([
+        #     transforms.ColorJitter(0.4, 0.4, 0.4, 0.1)
+        # ], p=0.8),
+        # transforms.RandomGrayscale(p=0.2),
+        # transforms.RandomApply([transforms.GaussianBlur(kernel_size=opt.size//20*2+1, sigma=(0.1, 2.0))], p=0.5 if opt.size>32 else 0.0),
         transforms.ToTensor(),
         normalize,
     ])
@@ -245,13 +253,13 @@ def set_loader_gpm_tinyimagenet(opt, normalize, replay_indices):
     train_sampler = None
     train_loader = torch.utils.data.DataLoader(
         train_dataset, batch_size=opt.batch_size, shuffle=(train_sampler is None),
-        num_workers=opt.num_workers, pin_memory=True, sampler=train_sampler, drop_last=True)
+        num_workers=opt.num_workers, pin_memory=True, sampler=train_sampler)
 
     return train_loader, subset_indices
 
 
 # 検証用tiny-imagenet
-def set_valloader_gpm_tinyimagenet(opt, normalize):
+def set_valloader_lucir_tinyimagenet(opt, normalize):
 
     val_transform = transforms.Compose([
         transforms.Resize(size=(opt.size, opt.size)),
@@ -277,7 +285,7 @@ def set_valloader_gpm_tinyimagenet(opt, normalize):
 
 
 # vanilla用tiny-imagenet
-def set_vanillaloader_gpm_tinyimagenet(opt, normalize):
+def set_vanillaloader_lucir_tinyimagenet(opt, normalize):
 
     train_transform = transforms.Compose([
         transforms.Resize(size=(opt.size, opt.size)),
@@ -306,29 +314,9 @@ def set_vanillaloader_gpm_tinyimagenet(opt, normalize):
 
     train_sampler = None
     train_loader = torch.utils.data.DataLoader(
-        train_dataset, batch_size=opt.batch_size, shuffle=(train_sampler is None),
+        train_dataset, batch_size=500, shuffle=(train_sampler is None),
         num_workers=opt.num_workers, pin_memory=True, sampler=train_sampler)
 
     return train_loader, subset_indices
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 

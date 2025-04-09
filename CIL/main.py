@@ -57,6 +57,10 @@ def parse_option():
     parser.add_argument('--mem_size', type=int, default=500)
     parser.add_argument('--mem_type', type=str, default="ring")
 
+    # 手法毎のハイパラ（共通）
+    parser.add_argument("--temp", type=float, default=2)
+    parser.add_argument("--lamda", type=float, default=5)
+
     # 手法毎のハイパラ（co2l）
     parser.add_argument('--current_temp', type=float, default=0.2)
     parser.add_argument('--past_temp', type=float, default=0.1)
@@ -181,6 +185,25 @@ def make_setup(opt):
         
         method_tools = {"feature_list": [], "threshold": None, "feature_mat": []}
     
+    elif opt.method == "lucir":
+
+        if opt.dataset in ["cifar10", "cifar100", "tiny-imagenet"]:
+            from models.resnet_cifar_lucir import BackboneResNet
+        elif opt.dataset in ["imagemet"]:
+            assert False
+
+        model = BackboneResNet(name='resnet18', head='linear', feat_dim=opt.cls_per_task)
+        print("model: ", model)
+
+        model2 = None
+        criterion = torch.nn.CrossEntropyLoss()
+        optimizer = optim.SGD(model.parameters(),
+                              lr=opt.learning_rate,
+                              momentum=opt.momentum,
+                              weight_decay=opt.weight_decay)
+        
+        method_tools = {"cur_lamda": opt.lamda}
+    
     elif opt.method == "scr":
         # from losses.loss_co2l import SupConLoss
         if opt.dataset in ["cifar10", "cifar100", "tiny-imagenet"]:
@@ -211,7 +234,7 @@ def make_setup(opt):
 
 def make_scheduler(opt, optimizer, epochs, dataloader):
 
-    if opt.method == "er":
+    if opt.method in ["er", "gpm"]:
         scheduler = None
     elif opt.method == "co2l":
         print("len(dataloader): ", len(dataloader))
@@ -220,12 +243,13 @@ def make_scheduler(opt, optimizer, epochs, dataloader):
             scheduler = lr_scheduler.OneCycleLR(optimizer, max_lr=0.02, total_steps=total_steps, pct_start=0.1, anneal_strategy='cos')
         else:
             scheduler = lr_scheduler.OneCycleLR(optimizer, max_lr=0.1, total_steps=total_steps, pct_start=0.1, anneal_strategy='cos')
-    elif opt.method == "gpm":
-        scheduler = None
+    elif opt.method == "lucir":
+        scheduler = lr_scheduler.MultiStepLR(optimizer, milestones=[80, 120], gamma=0.1)
     else:
         assert False
 
     return scheduler
+
 
 def main():
 
@@ -263,7 +287,7 @@ def main():
         replay_indices = set_buffer(opt, model, prev_indices=replay_indices)
         print("main.py replay_indices: ", replay_indices)
 
-        # バッファ内データのインデックスを保存（次タスクの学習時に読み込むため）
+        # バッファ内データのインデックスを保存（検証や分析時に読み込むため）
         np.save(
           os.path.join(opt.mem_path, 'replay_indices_{target_task}.npy'.format(target_task=target_task)),
           np.array(replay_indices))
@@ -271,7 +295,7 @@ def main():
         # データローダーの作成（バッファ内のデータも含めて）
         dataloader, subset_indices = set_loader(opt, replay_indices)
 
-
+        # 検証や分析用にデータを保存
         np.save(
           os.path.join(opt.mem_path, 'subset_indices_{target_task}.npy'.format(target_task=target_task)),
           np.array(subset_indices))
@@ -283,12 +307,11 @@ def main():
         else:
             opt.epochs = original_epochs
 
-
         # schedulerの作成
         scheduler = make_scheduler(opt=opt, epochs=opt.epochs, optimizer=optimizer, dataloader=dataloader["train"])
 
         # タスク開始後の前処理（gpmなどの前処理が必要な手法のため）
-        method_tools = pre_process(opt=opt, model=model, dataloader=dataloader, method_tools=method_tools)
+        method_tools, model, model2 = pre_process(opt=opt, model=model, model2=model2, dataloader=dataloader, method_tools=method_tools)
 
         # 訓練を実行
         for epoch in range(1, opt.epochs+1):
@@ -299,7 +322,7 @@ def main():
                   epoch=epoch, method_tools=method_tools)
             
         # タスク終了後の後処理（gpmなどの後処理が必要な手法のため）
-        method_tools = post_process(opt=opt, model=model, dataloader=dataloader, method_tools=method_tools)
+        method_tools, model2 = post_process(opt=opt, model=model, model2=model2, dataloader=dataloader, method_tools=method_tools)
             
 
 
@@ -307,10 +330,6 @@ def main():
 
 
     
-
-
-
-    return 
 
 if __name__ == "__main__":
     main()

@@ -5,7 +5,7 @@ from postprocesses.postprocess_gpm import postprocess_gpm
 
 
 
-def post_process(opt, model, dataloader, method_tools):
+def post_process(opt, model, model2, dataloader, method_tools):
 
     # データローダーの分解
     train_loader = dataloader["train"]
@@ -14,7 +14,7 @@ def post_process(opt, model, dataloader, method_tools):
     vanilla_loader = dataloader["vanilla"]
 
     if opt.method in ["er", "co2l"]:
-        return method_tools
+        return method_tools, model2
     elif opt.method == "gpm":
 
         # 
@@ -32,7 +32,10 @@ def post_process(opt, model, dataloader, method_tools):
         method_tools["feature_list"] = feature_list
         method_tools["threshold"] = threshold
     
+    elif opt.method == "lucir":
+        return method_tools, model2
+
     else:
         assert False
 
-    return method_tools
+    return method_tools, model2

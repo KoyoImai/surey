@@ -24,6 +24,17 @@ def set_buffer(opt, model, prev_indices=None):
     
     elif opt.method == "gpm":
         replay_indices = []
+
+    elif opt.method == "lucir":
+        from dataloaders.buffer_er import set_replay_samples_reservoir
+        from dataloaders.buffer_er import set_replay_samples_ring
+        if opt.mem_type == "reservoir":
+            replay_indices = set_replay_samples_reservoir(opt, model, prev_indices=prev_indices)
+        elif opt.mem_type == "ring":
+            replay_indices = set_replay_samples_ring(opt, model, prev_indices=prev_indices)
+        else:
+            assert False
+
     
     return replay_indices
 
