@@ -7,7 +7,7 @@ import torch
 
 def seed_everything(seed):
     # Python 内部のハッシュシードを固定（辞書等の再現性に寄与）
-    os.environ["PYTHONHASHSEED"] = str(seed)
+    # os.environ["PYTHONHASHSEED"] = str(seed)
     
     # Python 標準の乱数生成器のシード固定
     random.seed(seed)
@@ -19,11 +19,11 @@ def seed_everything(seed):
     torch.manual_seed(seed)
     if torch.cuda.is_available():
         torch.cuda.manual_seed(seed)
-        torch.cuda.manual_seed_all(seed)  # マルチGPU対応の場合
+        # torch.cuda.manual_seed_all(seed)  # マルチGPU対応の場合
     # Deterministic モードの有効化（PyTorch の一部非決定的な処理の回避）
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
-    torch.use_deterministic_algorithms(True)
+    # torch.use_deterministic_algorithms(True)
 
 
 class AverageMeter(object):

@@ -2,8 +2,10 @@
 import copy
 import math
 
+from scipy import optimize
 import torch
 import torch.nn as nn
+import torch.optim as optim
 
 from models.resnet_cifar_lucir import SplitCosineLinear
 
@@ -44,6 +46,14 @@ def preprocess_lucir(opt, model, model2, method_tools):
 
         # print("model: ", model)
 
+        # 拡張したmodelに合わせてOptimizerの再定義
+        optimizer = optim.SGD(model.parameters(),
+                              lr=opt.learning_rate,
+                              momentum=opt.momentum,
+                              weight_decay=opt.weight_decay)
+        
+        method_tools["optimizer"] = optimizer
+
         
         if torch.cuda.is_available():
             model = model.cuda()
@@ -80,6 +90,14 @@ def preprocess_lucir(opt, model, model2, method_tools):
         method_tools['cur_lamda'] = cur_lamda
 
         # print("model: ", model)
+
+        # 拡張したmodelに合わせてOptimizerの再定義
+        optimizer = optim.SGD(model.parameters(),
+                              lr=opt.learning_rate,
+                              momentum=opt.momentum,
+                              weight_decay=opt.weight_decay)
+        
+        method_tools["optimizer"] = optimizer
 
         
         if torch.cuda.is_available():

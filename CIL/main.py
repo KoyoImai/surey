@@ -5,6 +5,7 @@ import numpy as np
 import logging
 
 
+from scipy import optimize
 import torch
 import torch.optim as optim
 from torchvision import transforms, datasets
@@ -80,6 +81,7 @@ def parse_option():
     parser.add_argument('--print_freq', type=int, default=20)
     parser.add_argument('--num_workers', type=int, default=8)
     parser.add_argument('--seed', type=int, default=777)
+    parser.add_argument('--date', type=str, default="2001_05_02")
 
 
     opt = parser.parse_args()
@@ -158,6 +160,7 @@ def make_setup(opt):
                               lr=opt.learning_rate,
                               momentum=opt.momentum,
                               weight_decay=opt.weight_decay)
+        method_tools = {"optimizer": optimizer}
     
     elif opt.method == "co2l":
 
@@ -174,6 +177,7 @@ def make_setup(opt):
                                 lr=opt.learning_rate,
                                 momentum=opt.momentum,
                                 weight_decay=opt.weight_decay)
+        method_tools = {"optimizer": optimizer}
 
     elif opt.method == "gpm":
         
@@ -193,7 +197,7 @@ def make_setup(opt):
                               momentum=opt.momentum,
                               weight_decay=opt.weight_decay)
         
-        method_tools = {"feature_list": [], "threshold": None, "feature_mat": []}
+        method_tools = {"feature_list": [], "threshold": None, "feature_mat": [], "optimizer": optimizer}
     
     elif opt.method == "lucir":
 
@@ -212,7 +216,7 @@ def make_setup(opt):
                               momentum=opt.momentum,
                               weight_decay=opt.weight_decay)
         
-        method_tools = {"cur_lamda": opt.lamda}
+        method_tools = {"cur_lamda": opt.lamda, "optimizer": optimizer}
     
     elif opt.method == "scr":
         # from losses.loss_co2l import SupConLoss
@@ -228,6 +232,7 @@ def make_setup(opt):
                                 lr=opt.learning_rate,
                                 momentum=opt.momentum,
                                 weight_decay=opt.weight_decay)
+        assert False
 
     else:
         assert False
@@ -239,10 +244,12 @@ def make_setup(opt):
         if model2 is not None:
             model2 = model2.cuda()
     
-    return model, model2, criterion, optimizer, method_tools
+    return model, model2, criterion, method_tools
 
 
-def make_scheduler(opt, optimizer, epochs, dataloader):
+def make_scheduler(opt, epochs, dataloader, method_tools):
+
+    optimizer = method_tools["optimizer"]
 
     if opt.method in ["er", "gpm"]:
         scheduler = None
@@ -258,7 +265,7 @@ def make_scheduler(opt, optimizer, epochs, dataloader):
     else:
         assert False
 
-    return scheduler
+    return scheduler, method_tools
 
 
 def main():
@@ -270,7 +277,7 @@ def main():
     seed_everything(opt.seed)
 
     # logの名前
-    opt.log_name = f"{opt.log_name}_{opt.method}_{opt.mem_type}{opt.mem_size}_{opt.dataset}_seed{opt.seed}"
+    opt.log_name = f"{opt.log_name}_{opt.method}_{opt.mem_type}{opt.mem_size}_{opt.dataset}_seed{opt.seed}_date{opt.date}"
 
     # データローダ作成の前処理
     preparation(opt)
@@ -280,7 +287,7 @@ def main():
     logging.info("Experiment started")
 
     # modelの作成，損失関数の作成，Optimizerの作成
-    model, model2, criterion, optimizer, method_tools = make_setup(opt)
+    model, model2, criterion, method_tools = make_setup(opt)
 
     # バッファ内データのインデックス
     replay_indices = None
@@ -320,18 +327,21 @@ def main():
         else:
             opt.epochs = original_epochs
 
-        # schedulerの作成
-        scheduler = make_scheduler(opt=opt, epochs=opt.epochs, optimizer=optimizer, dataloader=dataloader["train"])
+        # # schedulerの作成
+        # scheduler = make_scheduler(opt=opt, epochs=opt.epochs, optimizer=optimizer, dataloader=dataloader["train"])
 
         # タスク開始後の前処理（gpmなどの前処理が必要な手法のため）
         method_tools, model, model2 = pre_process(opt=opt, model=model, model2=model2, dataloader=dataloader, method_tools=method_tools)
+
+        # schedulerの作成
+        scheduler, method_tools = make_scheduler(opt=opt, epochs=opt.epochs, dataloader=dataloader["train"], method_tools=method_tools)
 
         # 訓練を実行
         for epoch in range(1, opt.epochs+1):
 
             # 学習 & 検証
             train(opt=opt, model=model, model2=model2, criterion=criterion,
-                  optimizer=optimizer, scheduler=scheduler, dataloader=dataloader,
+                  optimizer=method_tools["optimizer"], scheduler=scheduler, dataloader=dataloader,
                   epoch=epoch, method_tools=method_tools)
             
         # タスク終了後の後処理（gpmなどの後処理が必要な手法のため）

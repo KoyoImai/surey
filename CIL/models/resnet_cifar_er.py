@@ -165,7 +165,7 @@ class BackboneResNet(nn.Module):
         super(BackboneResNet, self).__init__()
 
         seed_everything(seed=seed)
-        
+
         model_fun, dim_in = model_dict[name]
         self.encoder = model_fun()
 
@@ -192,10 +192,13 @@ class BackboneResNet(nn.Module):
 
     def forward(self, x, return_feat=False, norm=True):
         encoded = self.encoder(x)
-        if norm:
-            feat = F.normalize(self.head(encoded), dim=1)
-        else:
-            feat = self.head(encoded)
+        # if norm:
+        #     feat = F.normalize(self.head(encoded), dim=1)
+        # else:
+        #     feat = self.head(encoded)
+
+        feat = self.head(encoded)
+
         if return_feat:
             return feat, encoded
         else:

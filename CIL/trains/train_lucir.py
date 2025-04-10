@@ -67,7 +67,8 @@ def train_lucir(opt, model, model2, criterion, optimizer, scheduler, train_loade
         # print("labels.shape: ", labels.shape)
         
         # モデルにデータを入力
-        y_pred, cur_features = model(images, return_feat=True)
+        # y_pred, cur_features = model(images, return_feat=True)
+        y_pred, _ = model(images, return_feat=True)
         # print("y_pred.shape: ", y_pred.shape)
 
         # バッチサイズ

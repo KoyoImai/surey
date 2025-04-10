@@ -77,7 +77,7 @@ class ResNet(nn.Module):
         super(ResNet, self).__init__()
         
         seed_everything(seed=seed)
-        
+
         self.in_planes = nf
 
         self.conv1 = conv3x3(3, nf * 1, stride=1)
@@ -118,7 +118,7 @@ class ResNet(nn.Module):
             self.in_planes = planes * block.expansion
         return nn.Sequential(*layers)
 
-    def forward(self, x):
+    def forward(self, x, return_feat=False):
         bsz = x.size(0)
         self.act['conv_in'] = x.view(bsz, 3, 32, 32)
         out = relu(self.bn1(self.conv1(x.view(bsz, 3, 32, 32)))) 
@@ -127,9 +127,14 @@ class ResNet(nn.Module):
         out = self.layer3(out)
         out = self.layer4(out)
         out = self.avgpool(out)
+        feat = out
+        
         # out = avg_pool2d(out, 2)   # 元々はこれ
         out = out.view(out.size(0), -1)
 
+        if return_feat:
+            return self.fc(out), feat
+        
         return self.fc(out)
 
     

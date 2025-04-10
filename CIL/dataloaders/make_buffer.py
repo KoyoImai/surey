@@ -20,8 +20,13 @@ def set_buffer(opt, model, prev_indices=None):
 
 
     elif opt.method == "co2l":
-        from dataloaders.buffer_er import set_replay_samples_ring
-        replay_indices = set_replay_samples_ring(opt, model, prev_indices=prev_indices)
+
+        if opt.mem_type == "ring":
+            from dataloaders.buffer_er import set_replay_samples_ring
+            replay_indices = set_replay_samples_ring(opt, model, prev_indices=prev_indices)
+        elif opt.mem_type == "herding":
+            from dataloaders.buffer_lucir import set_replay_samples_herding
+            replay_indices = set_replay_samples_herding(opt, model, prev_indices=prev_indices)
     
 
     elif opt.method == "gpm":
