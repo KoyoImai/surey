@@ -105,7 +105,7 @@ def set_vanillaloader_er_cifar10(opt, normalize):
 
     train_sampler = None
     train_loader = torch.utils.data.DataLoader(
-        train_dataset, batch_size=500, shuffle=False,
+        train_dataset, batch_size=opt.vanilla_batch_size, shuffle=False,
         num_workers=opt.num_workers, pin_memory=True)
 
     return train_loader, subset_indices
@@ -251,7 +251,7 @@ def set_vanillaloader_er_cifar100(opt, normalize):
 
     train_sampler = None
     train_loader = torch.utils.data.DataLoader(
-        train_dataset, batch_size=500, shuffle=(train_sampler is None),
+        train_dataset, batch_size=opt.vanilla_batch_size, shuffle=(train_sampler is None),
         num_workers=opt.num_workers, pin_memory=True, sampler=train_sampler)
 
     return train_loader, subset_indices
@@ -398,7 +398,7 @@ def set_vanillaloader_er_tinyimagenet(opt, normalize):
 
     train_sampler = None
     train_loader = torch.utils.data.DataLoader(
-        train_dataset, batch_size=500, shuffle=(train_sampler is None),
+        train_dataset, batch_size=opt.vanilla_batch_size, shuffle=(train_sampler is None),
         num_workers=opt.num_workers, pin_memory=True, sampler=train_sampler)
 
     return train_loader, subset_indices

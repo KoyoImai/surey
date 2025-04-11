@@ -52,6 +52,8 @@ def parse_option():
     parser.add_argument('--start_epoch', type=int, default=None)
     parser.add_argument('--lr', type=float, default=0.1)
     parser.add_argument('--batch_size', type=int, default=10)
+    parser.add_argument('--vanilla_batch_size', type=int, default=500)
+
 
     # classifierの学習条件(Co2Lなど線形分類で後から評価する手法用)
     parser.add_argument('--linear_epochs', type=int, default=100)
@@ -71,6 +73,9 @@ def parse_option():
     parser.add_argument('--current_temp', type=float, default=0.2)
     parser.add_argument('--past_temp', type=float, default=0.1)
     parser.add_argument('--distill_power', type=float, default=0.1)
+
+    # 手法毎のハイパラ
+    parser.add_argument('--threshold', type=float, default=0.965)
 
     # 手法毎のハイパラ（lucir）
     parser.add_argument("--K", type=int, default=2)
@@ -124,9 +129,9 @@ def preparation(opt):
     # モデルの保存，実験記録などの保存先パス
     if opt.data_folder is None:
         opt.data_folder = '~/data/'
-    opt.model_path = f'./logs/{opt.log_name}/model/'
-    opt.explog_path = f'./logs/{opt.log_name}/exp_log/'
-    opt.mem_path = f'./logs/{opt.log_name}/mem_log/'
+    opt.model_path = f'./logs/{opt.method}/{opt.log_name}/model/'
+    opt.explog_path = f'./logs/{opt.method}/{opt.log_name}/exp_log/'
+    opt.mem_path = f'./logs/{opt.method}/{opt.log_name}/mem_log/'
 
     # ディレクトリ作成
     if not os.path.isdir(opt.model_path):

@@ -20,7 +20,7 @@ def post_process(opt, model, model2, dataloader, method_tools):
         # 
         # threshold = method_tools["threshold"]
         feature_list = method_tools["feature_list"]
-        threshold = np.array([0.965] * 20)
+        threshold = np.array([opt.threshold] * 20)
 
         # print("threshold: ", threshold)
         # print("feature_list: ", feature_list)

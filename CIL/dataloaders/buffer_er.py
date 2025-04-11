@@ -67,9 +67,13 @@ def set_replay_samples_reservoir(opt, model, prev_indices=None):
         observed_indices += np.where(val_targets == tc)[0].tolist()
     
     total_indices = prev_indices + observed_indices
+    # print("1 total_indices: ", total_indices)
     
     # ランダムにバッファサイズ分だけ取り出す
-    total_indices = random.shuffle(total_indices)
+    random.shuffle(total_indices)
+    # print("2 total_indices: ", total_indices)
+    # assert False
+
     total_indices = total_indices[:opt.mem_size]
 
     return total_indices

@@ -1,7 +1,9 @@
 import os
+import csv
 import random
 import numpy as np
 import torch
+
 
 
 
@@ -26,6 +28,7 @@ def seed_everything(seed):
     # torch.use_deterministic_algorithms(True)
 
 
+
 class AverageMeter(object):
     """Computes and stores the average and current value"""
     def __init__(self):
@@ -42,3 +45,26 @@ class AverageMeter(object):
         self.sum += val * n
         self.count += n
         self.avg = self.sum / self.count
+
+
+
+# csvファイルに値を書き込む
+def write_csv(value, path, file_name):
+
+
+    # パスの存在確認（存在しなければファイルを作成）
+    file_path = f"{path}/{file_name}.csv"
+    if not os.path.isfile(file_path):
+        
+        # ファイルが存在しない場合は新規作成
+        with open(file_path, 'w', newline='') as csvfile:
+            writer = csv.writer(csvfile)
+
+    # ファイルにvalueの値を書き込む
+    with open(file_path, 'a', newline='') as csvfile:
+        writer = csv.writer(csvfile)
+        # value がリストの場合はそのまま書き込む。単一の値の場合はリスト化する
+        if isinstance(value, list):
+            writer.writerow(value)
+        else:
+            writer.writerow([value])

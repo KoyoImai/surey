@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from util import AverageMeter
+from util import AverageMeter, write_csv
 
 logger = logging.getLogger(__name__)
 
