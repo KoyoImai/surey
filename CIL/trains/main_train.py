@@ -7,6 +7,7 @@ from trains.train_er import train_er, val_er, ncm_er
 from trains.train_co2l import ncm_co2l, train_co2l, val_co2l
 from trains.train_gpm import train_gpm_first, train_gpm_other, val_gpm, ncm_gpm
 from trains.train_lucir import train_lucir, val_lucir, ncm_lucir
+from trains.train_fsdgpm import train_fsdgpm
 
 
 logger = logging.getLogger(__name__)
@@ -70,6 +71,19 @@ def train(opt, model, model2, criterion, optimizer, scheduler, dataloader, epoch
 
         logger.info(f"task {opt.target_task} Epoch {epoch}: train_loss={loss:.4f}, \
                     ClassIL_accuracy={classil_acc:.3f}, TaskIL_accuracy={taskil_acc:.3f}, NCM_accuracy={ncm_acc:.3f}")
+    
+    elif opt.method == "fs-dgpm":
+        
+        train_fsdgpm(opt, model, model2, criterion, optimizer, scheduler, train_loader, epoch)
+
+        if opt.earlystop:
+            assert False
+        
+        assert False
+
+
+    else:
+        assert False
         
 
     

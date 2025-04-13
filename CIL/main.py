@@ -27,7 +27,7 @@ def parse_option():
 
     # 手法
     parser.add_argument('--method', type=str, default="",
-                        choices=['er', 'co2l', 'gpm', 'lucir'])
+                        choices=['er', 'co2l', 'gpm', 'lucir', 'fs-dgpm'])
 
     # logの名前（実行毎に変えてね）
     parser.add_argument('--log_name', type=str, default="practice")
@@ -64,6 +64,9 @@ def parse_option():
     parser.add_argument('--mem_size', type=int, default=500)
     parser.add_argument('--mem_type', type=str, default="ring",
                         choices=["reservoir", "ring", "herding"])
+    
+    # 使用するモデル
+    parser.add_argument("--model", type=str, default="resnet18")
 
     # 手法毎のハイパラ（共通）
     parser.add_argument("--temp", type=float, default=2)
@@ -82,11 +85,26 @@ def parse_option():
     parser.add_argument("--dist", type=float, default=0.5)
     parser.add_argument("--lw_mr", type=float, default=1)
 
+    # 手法毎のハイパラ（fs-dgpm）
+    # parser.add_argument('--inner_batches', type=int, default=2)
+    parser.add_argument('--inner_steps', type=int, default=2)
+    parser.add_argument('--freeze_bn', default=False, action='store_true')
+    parser.add_argument('--second_order', default=False, action='store_true', help='')
+    parser.add_argument('--mem_batch_size', type=int, default=64)
+    parser.add_argument('--grad_clip_norm', type=float, default=2.0, help='Clip the gradients by this value')
+    parser.add_argument('--sharpness', default=False, action='store_true', help='')
+    parser.add_argument('--eta1', type=float, default=1e-2, help='update step size of weight perturbation')
+    parser.add_argument('--eta2', type=float, default=1e-2, help='learning rate of lambda(soft weight for basis)')
+    parser.add_argument('--fsdgpm_method', type=str, default='xdgpm', choices=['xdgpm', 'dgpm', 'xgpm'])
+
+
+
     # その他の条件
     parser.add_argument('--print_freq', type=int, default=20)
     parser.add_argument('--num_workers', type=int, default=8)
     parser.add_argument('--seed', type=int, default=777)
     parser.add_argument('--date', type=str, default="2001_05_02")
+    parser.add_argument('--earlystop', default=False, action='store_true', help='')
 
 
     opt = parser.parse_args()
@@ -222,6 +240,25 @@ def make_setup(opt):
                               weight_decay=opt.weight_decay)
         
         method_tools = {"cur_lamda": opt.lamda, "optimizer": optimizer}
+
+    elif opt.method == "fs-dgpm":
+        if opt.dataset in ["cifar10", "cifar100", "tiny-imagenet"]:
+            if opt.model == "resnet18":
+                from models.resnet_cifar_fsdgpm import ResNet18
+                model = ResNet18(nf=64, nclass=opt.n_cls, seed=opt.seed, opt=opt)
+                print("model: ", model)
+                model2 = None
+            else:
+                assert False
+        elif opt.dataset in ["imagemet"]:
+            assert False
+        
+        criterion = torch.nn.CrossEntropyLoss()
+        optimizer = optim.SGD(model.parameters(),
+                              lr=opt.learning_rate,
+                              momentum=opt.momentum,
+                              weight_decay=opt.weight_decay)
+        method_tools = {"optimizer": optimizer}
     
     elif opt.method == "scr":
         # from losses.loss_co2l import SupConLoss
@@ -267,6 +304,8 @@ def make_scheduler(opt, epochs, dataloader, method_tools):
             scheduler = lr_scheduler.OneCycleLR(optimizer, max_lr=0.1, total_steps=total_steps, pct_start=0.1, anneal_strategy='cos')
     elif opt.method == "lucir":
         scheduler = lr_scheduler.MultiStepLR(optimizer, milestones=[80, 120], gamma=0.1)
+    elif opt.method in ["fs-dgpm"]:
+        scheduler = None
     else:
         assert False
 

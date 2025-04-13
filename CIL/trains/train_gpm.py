@@ -1,4 +1,5 @@
 import logging
+from os import write
 import numpy as np
 
 import torch
@@ -50,6 +51,9 @@ def train_gpm_first(opt, model, criterion, optimizer, scheduler, train_loader, e
             print('Train: [{0}][{1}/{2}]\t'
                   'loss {loss.val:.3f} ({loss.avg:.3f})'.format(
                    epoch, idx + 1, len(train_loader), loss=losses))
+        
+        # csvファイルに書き込み
+        write_csv(value=loss.item(), path=opt.explog_path, file_name='loss', epoch=epoch)
             
     
     return losses.avg
@@ -111,9 +115,9 @@ def train_gpm_other(opt, model, criterion, optimizer, scheduler, train_loader, e
                   'loss {loss.val:.3f} ({loss.avg:.3f})'.format(
                    epoch, idx + 1, len(train_loader), loss=losses))
 
-        # print('Train: [{0}][{1}/{2}]\t'
-        #         'loss {loss.val:.3f} ({loss.avg:.3f})'.format(
-        #         epoch, idx + 1, len(train_loader), loss=losses))
+
+        # csvファイルに書き込み
+        write_csv(value=loss.item(), path=opt.explog_path, file_name='loss', epoch=epoch)
 
     return losses.avg
 

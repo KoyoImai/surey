@@ -49,22 +49,27 @@ class AverageMeter(object):
 
 
 # csvファイルに値を書き込む
-def write_csv(value, path, file_name):
-
-
-    # パスの存在確認（存在しなければファイルを作成）
+def write_csv(value, path, file_name, epoch):
+    # ファイルパスを生成
     file_path = f"{path}/{file_name}.csv"
+
+    # ファイルが存在しなければ新規作成、かつヘッダー行を記入する
+    # value がリストの場合は、ヘッダーの値部分は要素数に合わせて "value_1", "value_2", ... とする例
     if not os.path.isfile(file_path):
-        
-        # ファイルが存在しない場合は新規作成
         with open(file_path, 'w', newline='') as csvfile:
             writer = csv.writer(csvfile)
+            # ヘッダー行を定義（必要に応じて適宜変更）
+            if isinstance(value, list):
+                header = ["epoch"] + [f"value_{i+1}" for i in range(len(value))]
+            else:
+                header = ["epoch", "value"]
+            writer.writerow(header)
 
-    # ファイルにvalueの値を書き込む
+    # CSV に実際のデータを追加記録する
     with open(file_path, 'a', newline='') as csvfile:
         writer = csv.writer(csvfile)
-        # value がリストの場合はそのまま書き込む。単一の値の場合はリスト化する
         if isinstance(value, list):
-            writer.writerow(value)
+            row = [epoch] + value
         else:
-            writer.writerow([value])
+            row = [epoch, value]
+        writer.writerow(row)

@@ -24,6 +24,11 @@ from dataloaders.dataloader_lucir import set_loader_lucir_cifar10, set_valloader
 from dataloaders.dataloader_lucir import set_loader_lucir_cifar100, set_valloader_lucir_cifar100
 from dataloaders.dataloader_lucir import set_loader_lucir_tinyimagenet, set_valloader_lucir_tinyimagenet
 
+# fs-dgpm
+from dataloaders.dataloader_fsdgpm import set_loader_fsdgpm_cifar10, set_valloader_fsdgpm_cifar10
+from dataloaders.dataloader_fsdgpm import set_loader_fsdgpm_cifar100, set_valloader_fsdgpm_cifar100
+from dataloaders.dataloader_fsdgpm import set_loader_fsdgpm_tinyimagenet, set_valloader_fsdgpm_tinyimagenet
+
 
 
 
@@ -111,6 +116,25 @@ def set_loader(opt, replay_indices):
         elif opt.dataset == "tiny-imagenet":
             train_loader, subset_indices = set_loader_lucir_tinyimagenet(opt=opt, normalize=normalize, replay_indices=replay_indices)
             val_loader = set_valloader_lucir_tinyimagenet(opt=opt, normalize=normalize)
+            linear_loader = None
+        else:
+            assert False
+
+    elif opt.method == "fs-dgpm":
+        if opt.dataset == "cifar10":
+            # train_loader, subset_indices = set_loader_er_cifar10(opt=opt, normalize=normalize, replay_indices=replay_indices)
+            train_loader, subset_indices = set_loader_fsdgpm_cifar10(opt=opt, normalize=normalize, replay_indices=replay_indices)
+            val_loader = set_valloader_fsdgpm_cifar10(opt=opt, normalize=normalize)
+            linear_loader = None
+        elif opt.dataset == "cifar100":
+            # train_loader, subset_indices = set_loader_er_cifar100(opt=opt, normalize=normalize, replay_indices=replay_indices)
+            train_loader, subset_indices = set_loader_fsdgpm_cifar100(opt=opt, normalize=normalize, replay_indices=replay_indices)
+            val_loader = set_valloader_fsdgpm_cifar100(opt=opt, normalize=normalize)
+            linear_loader = None
+        elif opt.dataset == "tiny-imagenet":
+            # train_loader, subset_indices = set_loader_er_tinyimagenet(opt=opt, normalize=normalize, replay_indices=replay_indices)
+            train_loader, subset_indices = set_loader_fsdgpm_tinyimagenet(opt=opt, normalize=normalize, replay_indices=replay_indices)
+            val_loader = set_valloader_fsdgpm_tinyimagenet(opt=opt, normalize=normalize)
             linear_loader = None
         else:
             assert False
