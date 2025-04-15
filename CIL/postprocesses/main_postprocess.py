@@ -2,6 +2,7 @@
 import numpy as np
 
 from postprocesses.postprocess_gpm import postprocess_gpm
+from postprocesses.postprocess_fsdgpm import postprocess_fsdgpm
 
 
 
@@ -34,6 +35,9 @@ def post_process(opt, model, model2, dataloader, method_tools):
     
     elif opt.method == "lucir":
         return method_tools, model2
+    
+    elif opt.method == "fs-dgpm":
+        postprocess_fsdgpm(opt=opt, model=model)
 
     else:
         assert False

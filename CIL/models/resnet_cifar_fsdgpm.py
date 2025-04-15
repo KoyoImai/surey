@@ -90,7 +90,6 @@ def basicblock_forward(x, block, params, idx):
     return out, idx
 
 
-
 def functional_layer_forward(x, layer, params, idx):
     """
     指定された Sequential で構成された層（layer1～layer4）の各 BasicBlock について，
@@ -146,6 +145,11 @@ class ResNet(nn.Module):
         self.freeze_bn = opt.freeze_bn
         self.second_order = opt.second_order
         self.opt = opt
+
+        if opt.dataset == "tiny-imagenet":
+            self.n_rep = 21
+        else:
+            self.n_rep = 21
 
         # eta1: 重みへのせちつどうの更新ステップサイズ
         self.eta1 = opt.eta1
@@ -204,24 +208,26 @@ class ResNet(nn.Module):
             self.in_planes = planes * block.expansion
         return nn.Sequential(*layers)
 
-    # def forward(self, x, return_feat=False):
-    #     bsz = x.size(0)
-    #     self.act['conv_in'] = x.view(bsz, 3, 32, 32)
-    #     out = relu(self.bn1(self.conv1(x.view(bsz, 3, 32, 32)))) 
-    #     out = self.layer1(out)
-    #     out = self.layer2(out)
-    #     out = self.layer3(out)
-    #     out = self.layer4(out)
-    #     out = self.avgpool(out)
-    #     feat = out
-        
-    #     # out = avg_pool2d(out, 2)   # 元々はこれ
-    #     out = out.view(out.size(0), -1)
 
-    #     if return_feat:
-    #         return self.fc(out), feat
+    def forward(self, x, return_feat=False):
+        bsz = x.size(0)
+        self.act['conv_in'] = x.view(bsz, 3, 32, 32)
+        out = relu(self.bn1(self.conv1(x.view(bsz, 3, 32, 32)))) 
+        out = self.layer1(out)
+        out = self.layer2(out)
+        out = self.layer3(out)
+        out = self.layer4(out)
+        out = self.avgpool(out)
+        feat = out
         
-    #     return self.fc(out)
+        # out = avg_pool2d(out, 2)   # 元々はこれ
+        out = out.view(out.size(0), -1)
+
+        if return_feat:
+            return self.fc(out), feat
+        
+        return self.fc(out)
+
 
     def get_params(self):
         self.vars = []
@@ -229,11 +235,202 @@ class ResNet(nn.Module):
             if p.requires_grad:
                 self.vars.append(p)
         return self.vars
+    
+
+    def conv_to_linear(self, x, conv, batchsize=None):
+        
+        kernel = conv.kernel_size
+        stride = conv.stride
+        padding = conv.padding
+
+        if batchsize is None:
+            batchsize = x.size(0)
+        
+        # パディングが必要な場合
+        if padding[0] > 0 or padding[1] > 0:
+            y = torch.zeros((x.size(0), x.size(1), x.size(2) + 2*padding[0],
+                             x.size(3) + 2*padding[1]), device=x.device, dtype=x.dtype)
+            y[:, :, padding[0]:padding[0]+x.size(2), padding[1]:padding[1]+x.size(3)] = x
+        else:
+            y = x
+        
+        # 形状獲得
+        h = y.size(2)
+        w = y.size(3)
+        kh, kw = kernel[0], kernel[1]
+        fs = []
+
+        # スライディングウィンドウで各局所領域を抽出
+        for i in range(0, h, stride[0]):
+            for j in range(0, w, stride[1]):
+                if i+kh > h or j+kw > w:
+                    break
+                f = y[:, :, i:i+kh, j:j+kw]
+                # f = f.view(batchsize, 1, -1)   # 各パッチを1次元にflatten
+                f = f.reshape(batchsize, 1, -1)  # 各パッチを1次元にflatten
+                if i == 0 and j == 0:
+                    fs = f
+                else:
+                    fs = torch.cat((fs, f), dim=1)
+        
+        # 最終的に (batchsize * num_patches, channels*kh*kw) の形状に変換
+        fs = fs.view(-1, fs.size(-1))
+        
+        # conv 層そのものの出力
+        h_out = conv(x)
+        
+        return fs, h_out
+
+
+    def svd_block_forward(self, block, x, y):
+        
+        """
+        'block' を通す際に、conv1とconv2の入力に対して
+        conv_to_linear() でパッチ行列を取得し、リスト y に保存する。
+        最後に block の出力を返す。
+        """
+        
+        # ----- conv1 -----
+        # conv1 へ入力される x に対してパッチを生成
+        fs_conv1, conv1_in = self.conv_to_linear(x, block.conv1)
+        y.append(fs_conv1)  
+        # conv1 -> bn1 -> relu
+        # print("conv1_in.shape: ", conv1_in.shape)
+        # out = block.conv1(conv1_in)
+        out = block.conv1(x)
+        out = block.bn1(out)
+        out = F.relu(out)
+
+        # ----- conv2 -----
+        # conv2 へ入力される out に対してパッチを生成
+        fs_conv2, conv2_in = self.conv_to_linear(out, block.conv2)
+        y.append(fs_conv2)
+        # conv2 -> bn2
+        # out2 = block.conv2(conv2_in)
+        out2 = block.conv2(out)
+        out2 = block.bn2(out2)
+
+        # shortcut
+        if len(block.shortcut) > 0:
+            # sc = block.shortcut(x)
+            shortcut_conv = block.shortcut[0]
+            shortcut_bn = block.shortcut[1]
+
+            fs_sc, sc_in = self.conv_to_linear(x, shortcut_conv)
+            # y.append(fs_sc)  # shortcut conv 入力
+            y.append(fs_sc)    # shortcut conv 入力
+            sc_out = shortcut_conv(x)
+            sc_out = shortcut_bn(sc_out)
+        else:
+            sc_out = x
+
+        out = out2 + sc_out
+        out = F.relu(out)
+
+        return out
 
     def net_forward(self, x, vars=None, svd=False):
 
         if svd:
-            assert False
+            
+            # リスト y に行列（パッチ行列 or fc入力）を追加していく
+            y = []
+
+            # --- stem (最初の conv1, bn1, relu) はパッチ取得しないでそのまま通す ---
+            # out = self.conv1(x)
+            # out = self.bn1(out)
+            # out = F.relu(out)
+            # print("out.shape: ", out.shape)
+
+            fs, out = self.conv_to_linear(x, self.conv1)
+            # conv1 の出力には bn1 と ReLU を適用
+            out = self.bn1(out)
+            out = F.relu(out)
+            y.append(fs)
+            # print("out.shape: ", out.shape)     # out.shape:  torch.Size([125, 64, 32, 32])
+            # print("y[0].shape: ", y[0].shape)   # y[0].shape:  torch.Size([128000, 27])
+            
+            # --- layer1 ---
+            # layer1 の block[0]
+            out = self.svd_block_forward(self.layer1[0], out, y)
+            # print("out.shape: ", out.shape)     # out.shape:  torch.Size([125, 64, 32, 32])
+            # print("y[1].shape: ", y[1].shape)   # y[0].shape:  torch.Size([128000, 576])
+            # print("y[2].shape: ", y[2].shape)   # y[2].shape:  torch.Size([128000, 576])
+
+            # layer1 の block[1]
+            out = self.svd_block_forward(self.layer1[1], out, y)
+            # print("out.shape: ", out.shape)     # out.shape:  torch.Size([125, 64, 32, 32])
+            # print("y[3].shape: ", y[3].shape)   # y[3].shape:  torch.Size([128000, 576])
+            # print("y[4].shape: ", y[4].shape)   # y[4].shape:  torch.Size([128000, 576])
+
+            # --- layer2 ---
+            out = self.svd_block_forward(self.layer2[0], out, y)
+            # print("out.shape: ", out.shape)     # out.shape:  torch.Size([125, 128, 16, 16])
+            # print("y[5].shape: ", y[5].shape)   # y[5].shape:  torch.Size([32000, 576])
+            # print("y[6].shape: ", y[6].shape)   # y[6].shape:  torch.Size([32000, 1152])
+            # print("y[7].shape: ", y[7].shape)   # y[7].shape:  torch.Size([32000, 64])
+
+            out = self.svd_block_forward(self.layer2[1], out, y)
+            # print("out.shape: ", out.shape)     # out.shape:  torch.Size([125, 128, 16, 16])
+            # print("y[8].shape: ", y[8].shape)   # y[8].shape:  torch.Size([32000, 1152])
+            # print("y[9].shape: ", y[9].shape)   # y[9].shape:  torch.Size([32000, 1152])
+
+            # --- layer3 ---
+            out = self.svd_block_forward(self.layer3[0], out, y)
+            # print("out.shape: ", out.shape)       # out.shape:  torch.Size([125, 256, 8, 8])
+            # print("y[10].shape: ", y[10].shape)   # y[10].shape:  torch.Size([8000, 1152])
+            # print("y[11].shape: ", y[11].shape)   # y[11].shape:  torch.Size([8000, 2304])
+            # print("y[12].shape: ", y[12].shape)   # y[12].shape:  torch.Size([8000, 128])
+
+            out = self.svd_block_forward(self.layer3[1], out, y)
+            # print("out.shape: ", out.shape)       # out.shape:  torch.Size([125, 256, 8, 8])
+            # print("y[13].shape: ", y[13].shape)   # y[13].shape:  torch.Size([8000, 2304])
+            # print("y[14].shape: ", y[14].shape)   # y[14].shape:  torch.Size([8000, 2304])
+
+
+            # --- layer4 ---
+            out = self.svd_block_forward(self.layer4[0], out, y)
+            # print("out.shape: ", out.shape)       # out.shape:  torch.Size([125, 512, 4, 4])
+            # print("y[15].shape: ", y[15].shape)   # y[15].shape:  torch.Size([2000, 2304])
+            # print("y[16].shape: ", y[16].shape)   # y[16].shape:  torch.Size([2000, 4608])
+            # print("y[17].shape: ", y[17].shape)   # y[17].shape:  torch.Size([2000, 256])
+
+            out = self.svd_block_forward(self.layer4[1], out, y)
+            # print("out.shape: ", out.shape)       # out.shape:  torch.Size([125, 512, 4, 4])
+            # print("y[18].shape: ", y[18].shape)   # y[18].shape:  torch.Size([2000, 4608])
+            # print("y[19].shape: ", y[19].shape)   # y[19].shape:  torch.Size([2000, 4608])
+
+            # avgpool->flatten->fc 入力もパッチにするなら下記など
+            out = self.avgpool(out)
+            # print("out.shape: ", out.shape)   # out.shape:  torch.Size([125, 512, 1, 1])
+            out = out.view(out.size(0), -1)
+            # print("out.shape: ", out.shape)   # out.shape:  torch.Size([125, 512])
+            y.append(out)
+
+            print("len(y): ", len(y))
+            # Layer 1 : (27, 51200)
+            # Layer 2 : (576, 51200)
+            # Layer 3 : (576, 51200)
+            # Layer 4 : (576, 51200)
+            # Layer 5 : (576, 51200)
+            # Layer 6 : (576, 12800)
+            # Layer 7 : (1152, 12800)
+            # Layer 8 : (64, 12800)
+            # Layer 9 : (1152, 12800)
+            # Layer 10 : (1152, 64000)
+            # Layer 11 : (1152, 16000)
+            # Layer 12 : (2304, 16000)
+            # Layer 13 : (128, 16000)
+            # Layer 14 : (2304, 32000)
+            # Layer 15 : (2304, 32000)
+            # Layer 16 : (2304, 8000)
+            # Layer 17 : (4608, 8000)
+            # Layer 18 : (256, 8000)
+            # Layer 19 : (4608, 8000)
+            # Layer 20 : (4608, 8000)
+
+            return y
+        
 
         elif vars is not None:
             # 外部パラメータによる順伝搬
@@ -276,17 +473,34 @@ class ResNet(nn.Module):
 
         
         else:
+
+            # print("x.shape: ", x.shape)   # x.shape:  torch.Size([32, 3, 32, 32])
+
             # 元のパラメータで順伝搬
+            # conv1
             out = self.conv1(x)
             out = self.bn1(out)
             out = F.relu(out)
+            
+            # layer1
             out = self.layer1(out)
+            # print("out.shape: ", out.shape)  # out.shape:  torch.Size([32, 64, 32, 32])
+            # assert False
+            
+            # layer2
             out = self.layer2(out)
+            
+            # layer3
             out = self.layer3(out)
+            
+            # layer4
             out = self.layer4(out)
+            
             out = self.avgpool(out)
             out_flat = out.view(out.size(0), -1)
             # print("out_flat.shape: ", out_flat.shape)
+            
+            # 最終層
             out_fc = self.fc(out_flat)
             # print("out_fc.shape: ", out_fc.shape)
         
@@ -354,7 +568,6 @@ class ResNet(nn.Module):
         self.zero_grad()
 
         if len(self.M_vec) > 0 and self.opt.fsdgpm_method in ['dgpm', 'xdgpm']:
-            assert False
             self.lambdas.zero_grad()
 
 
@@ -395,14 +608,17 @@ class ResNet(nn.Module):
         
         # print("fast_weights: ", fast_weights)
 
+        # NOTE if we want higher order grads to be allowed, change create_graph=False to True
+        # print("self.second_order: ", self.second_order)
         graph_required = self.second_order
         grads = list(torch.autograd.grad(loss, fast_weights, create_graph=graph_required, retain_graph=graph_required,
                                          allow_unused=True))
 
         # 勾配の射影
         if len(self.M_vec) > 0:
-            assert False
             grads = self.grad_projection(grads)
+            # print("len(grads): ", len(grads))
+            # a = 1
 
         # 勾配のクリッピング
         for i in range(len(grads)):
@@ -419,6 +635,201 @@ class ResNet(nn.Module):
                 map(lambda p: p[1] - p[0] * self.eta1 if p[0] is not None else p[1], zip(grads, fast_weights)))
 
         return fast_weights
+    
+
+    def define_lambda_params(self):
+        assert len(self.M_vec) > 0
+
+        # Setup learning parameters
+        self.lambdas = nn.ParameterList([])
+        for i in range(len(self.M_vec)):
+            self.lambdas.append(nn.Parameter(self.opt.lam_init * torch.ones((self.M_vec[i].shape[1]), requires_grad=True)))
+
+        if self.cuda:
+            self.lambdas = self.lambdas.cuda()
+
+        return
+
+
+    def update_opt_lambda(self, lr=None):
+        if lr is None:
+            lr = self.eta2
+        self.opt_lamdas = torch.optim.SGD(list(self.lambdas.parameters()), lr=lr, momentum=self.opt.momentum)
+
+        return
+
+
+
+    # def grad_projection(self, grads):
+    #     """
+    #         get the projection of grads on the subspace spanned by GPM
+    #         """
+    #     j = 0
+
+    
+    # def grad_projection(self, grads):
+    #     """
+    #         get the projection of grads on the subspace spanned by GPM
+    #         """
+    #     j = 0
+    #     ndim_1 = 0
+    #     ndim_2 = 0
+    #     ndim_4 = 0
+    #     for i in range(len(grads)):
+    #         g = grads[i]
+    #         # print("g.ndim: ", g.ndim)
+    #         if g is not None:
+    #             if g.ndim == 1:
+    #                 ndim_1 += 1
+    #             elif g.ndim == 2:
+    #                 ndim_2 += 1
+    #             elif g.ndim == 4:
+    #                 ndim_4 += 1
+    #             else:
+    #                 assert False
+    #     print("ndim_1: ", ndim_1)  # ndim_1:  41
+    #     print("ndim_2: ", ndim_2)  # ndim_2:  1
+    #     print("ndim_4: ", ndim_4)  # ndim_4:  20
+
+
+    #     assert False
+
+    def grad_projection(self, grads):
+        """
+            get the projection of grads on the subspace spanned by GPM
+            """
+        j = 0
+        # print("self.lambdas: ", self.lambdas)
+        # print("len(self.lambdas): ", len(self.lambdas))
+        # print("len(grads): ", len(grads))
+        # print("len(self.M_vec): ", len(self.M_vec))
+        for i in range(len(grads)):
+            # only update conv weight and fc weight
+            # ignore perturbations with 1 dimension (e.g. BN, bias)
+            if grads[i] is None:
+                continue
+            if grads[i].ndim <= 1:
+                continue
+            # print("grads[i].ndim: ", grads[i].ndim)
+            if j < len(self.M_vec):
+                if self.opt.fsdgpm_method in ['dgpm', 'xdgpm']:
+                    # lambdas = torch.sigmoid(self.args.tmp * self.lambdas[j]).reshape(-1)
+                    lambdas = self.lambdas[j]
+                else:
+                    lambdas = torch.ones(self.M_vec[j].shape[1])
+
+                if self.cuda:
+                    self.M_vec[j] = self.M_vec[j].cuda()
+                    lambdas = lambdas.cuda()
+
+                if grads[i].ndim == 4:
+                    # rep[i]: n_samples * n_features
+                    grad = grads[i].reshape(grads[i].shape[0], -1)
+                    grad = torch.mm(torch.mm(torch.mm(grad, self.M_vec[j]), torch.diag(lambdas)), self.M_vec[j].T)
+                    grads[i] = grad.reshape(grads[i].shape).clone()
+                else:
+                    grads[i] = torch.mm(torch.mm(torch.mm(grads[i], self.M_vec[j]), torch.diag(lambdas)), self.M_vec[j].T)
+
+                j += 1
+        
+        # print("len(grads): ", len(grads))
+
+        return grads
+    
+    
+    
+    def train_restgpm(self):
+        """
+            update grad to the projection on the rest of subspace spanned by GPM
+            """
+        j = 0
+
+        for p in self.parameters():
+            # only handle conv weight and fc weight
+            if p.grad is None:
+                continue
+            if p.grad.ndim != 2 and p.grad.ndim != 4:
+                continue
+            if j < len(self.M_vec):
+                if self.opt.method in ['fs-dgpm'] and self.opt.fsdgpm_method in ['dgpm', 'xdgpm']:
+                    # lambdas = torch.sigmoid(self.args.tmp * self.lambdas[j]).reshape(-1)
+                    lambdas = self.lambdas[j]
+                else:
+                    lambdas = torch.ones(self.M_vec[j].shape[1])
+
+                if self.cuda:
+                    self.M_vec[j] = self.M_vec[j].cuda()
+                    lambdas = lambdas.cuda()
+
+                if p.grad.ndim == 4:
+                    # rep[i]: n_samples * n_features
+                    grad = p.grad.reshape(p.grad.shape[0], -1)
+                    grad -= torch.mm(torch.mm(torch.mm(grad, self.M_vec[j]), torch.diag(lambdas)), self.M_vec[j].T)
+                    p.grad = grad.reshape(p.grad.shape).clone()
+                else:
+                    p.grad -= torch.mm(torch.mm(torch.mm(p.grad, self.M_vec[j]), torch.diag(lambdas)), self.M_vec[j].T)
+
+                j += 1
+
+
+    def set_gpm_by_svd(self, threshold):
+        """
+            Get the bases matrix (GPM) based on data sampled from replay buffer
+            """
+        assert len(self.M) > 0
+
+        self.M_vec = []
+        self.M_val = []
+
+        # リプレイバッファからサンプル抽出
+        index = np.arange(len(self.M))
+        np.random.shuffle(index)
+
+        # 
+        for k, idx in enumerate(index):
+            if k < min(self.mem_batch_size, len(self.M)):
+                ox, oy, ot = self.M[idx]
+                if k == 0:
+                    mx = ox.unsqueeze(0)
+                else:
+                    mx = torch.cat((mx, ox.unsqueeze(0)), 0)
+
+        # print("mx.shape: ", mx.shape)   # mx.shape:  torch.Size([64, 3, 32, 32])
+
+        if self.cuda:
+            mx = mx.cuda()
+
+        # 中間層の出力と最終出力を獲得する
+        with torch.no_grad():
+            rep = self.net_forward(mx, svd=True)
+            # print("rep[1].shape: ", rep[1].shape)  # rep[1].shape:  torch.Size([64, 100])
+        
+        # 
+        for i in range(len(rep)):
+            # rep[i]: n_samples * n_features
+            assert rep[i].ndim == 2
+
+            # SVD
+            u, s, v = torch.svd(rep[i].detach().cpu())
+            print()
+            print("u.shape: ", u.shape)
+            print("s.shape: ", s.shape)
+            print("v.shape: ", v.shape)
+
+            if threshold[i] < 1:
+                r = torch.cumsum(s ** 2, 0) / torch.cumsum(s ** 2, 0)[-1]
+                k = torch.searchsorted(r, threshold[i]) + 1
+
+            elif threshold[i] > 10:
+                # differ with thres = 1
+                k = int(threshold[i])
+            else:
+                k = len(s)
+
+            if k > 0:
+                self.M_vec.append(v[:, :k].cpu())
+                self.M_val.append(s[:k].cpu())
+    
 
     
 

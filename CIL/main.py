@@ -77,7 +77,7 @@ def parse_option():
     parser.add_argument('--past_temp', type=float, default=0.1)
     parser.add_argument('--distill_power', type=float, default=0.1)
 
-    # 手法毎のハイパラ
+    # 手法毎のハイパラ（gpm & fs-dgpm）
     parser.add_argument('--threshold', type=float, default=0.965)
 
     # 手法毎のハイパラ（lucir）
@@ -96,7 +96,10 @@ def parse_option():
     parser.add_argument('--eta1', type=float, default=1e-2, help='update step size of weight perturbation')
     parser.add_argument('--eta2', type=float, default=1e-2, help='learning rate of lambda(soft weight for basis)')
     parser.add_argument('--fsdgpm_method', type=str, default='xdgpm', choices=['xdgpm', 'dgpm', 'xgpm'])
-
+    parser.add_argument('--thres_add', type=float, default=0.003, help='thres_add')
+    parser.add_argument('--thres_last', type=float, default=0.99999999999, help='thres_last')
+    parser.add_argument('--lam_init', type=float, default=1.0, help='temperature for sigmoid')
+    parser.add_argument('--tmp', type=float, default=10, help='temperature for sigmoid')
 
 
     # その他の条件

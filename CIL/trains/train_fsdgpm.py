@@ -1,11 +1,19 @@
 
 import math
+import logging
+import numpy as np
+
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 
 from util import AverageMeter, write_csv
+
+
+logger = logging.getLogger(__name__)
+
 
 
 
@@ -16,6 +24,8 @@ def train_fsdgpm(opt, model, model2, criterion, optimizer, scheduler, train_load
 
     # 学習記録
     losses = AverageMeter()
+
+    print("len(train_loader): ", len(train_loader))
 
     for idx, (images, labels) in enumerate(train_loader):
 
@@ -51,7 +61,7 @@ def train_fsdgpm(opt, model, model2, criterion, optimizer, scheduler, train_load
                 batch_x = images[j:]
                 batch_y = labels[j:]
         
-            # 現在タスクのデータを用いてhsarpnessの評価を行う
+            # 現在タスクのデータを用いてsharpnessの評価を行う
             fast_weights = model.update_weight(batch_x, batch_y, opt.target_task, fast_weights, criterion)
             
             # samples for weight/lambdas update are from the current task and old tasks
@@ -60,24 +70,34 @@ def train_fsdgpm(opt, model, model2, criterion, optimizer, scheduler, train_load
 
         # Taking the gradient step
         with torch.autograd.set_detect_anomaly(True):
+            # print("idx: ", idx)
+            # print("meta_losses: ", meta_losses)
             optimizer.zero_grad()
             model.zero_grads()
             loss = torch.mean(meta_losses)
-            loss.backward()
+            # print("loss: ", loss)
+            # loss.backward()
+            loss.backward(retain_graph=True)
             torch.nn.utils.clip_grad_norm_(model.parameters(), model.opt.grad_clip_norm)
 
-        if len(model.M_vec) > 0:
+        # 2025/04/14
 
+        if len(model.M_vec) > 0:
+            # assert False
             # update the lambdas
             if model.opt.fsdgpm_method in ['dgpm', 'xdgpm']:
                 torch.nn.utils.clip_grad_norm_(model.lambdas.parameters(), model.opt.grad_clip_norm)
                 if model.opt.sharpness:
+                    # print("model.lambdas.parameters(): ", model.lambdas.parameters())
+                    # print("model.lambdas: ", model.lambdas)
                     model.opt_lamdas.step()
+                    # print("model.lambdas.parameters(): ", model.lambdas.parameters())
+                    # print("model.lambdas: ", model.lambdas)
                 else:
                     model.opt_lamdas_step()
 
-                for idx in range(len(model.lambdas)):
-                    model.lambdas[idx] = nn.Parameter(torch.sigmoid(model.opt.tmp * model.lambdas[idx]))
+                for i in range(len(model.lambdas)):
+                    model.lambdas[i] = nn.Parameter(torch.sigmoid(model.opt.tmp * model.lambdas[i]))
 
             # only use updated lambdas to update weight
             if model.opt.fsdgpm_method == 'dgpm':
@@ -96,7 +116,7 @@ def train_fsdgpm(opt, model, model2, criterion, optimizer, scheduler, train_load
         
         # update metric
         losses.update(loss.item(), bsz)
-
+        
         # 学習記録の表示
         if (idx+1) % opt.print_freq == 0 or idx+1 == len(train_loader):
             print('Train: [{0}][{1}/{2}]\t'
@@ -106,4 +126,54 @@ def train_fsdgpm(opt, model, model2, criterion, optimizer, scheduler, train_load
         if epoch == 1:
             model.push_to_mem(images, labels, torch.tensor(opt.target_task), epoch)
 
-    assert False
+
+
+def val_fsdgpm(opt, model, model2, criterion, optimizer, scheduler, train_loader, val_loader, epoch):
+
+    
+    # modelをevalモードに変更
+    model.eval()
+
+    # タスク毎の精度を保持
+    corr = [0.] * (opt.target_task + 1) * opt.cls_per_task
+    cnt  = [0.] * (opt.target_task + 1) * opt.cls_per_task
+    correct_task = 0.0
+
+    losses = AverageMeter()
+
+    with torch.no_grad():
+
+        for idx, (images, labels) in enumerate(val_loader):
+
+            images = images.float().cuda()
+            labels = labels.cuda()
+            bsz = labels.shape[0]
+
+            y_pred = model(images)
+            loss = criterion(y_pred, labels)
+
+            losses.update(loss.item(), bsz)
+
+            cls_list = np.unique(labels.cpu())
+            correct_all = (y_pred.argmax(1) == labels)
+
+            for tc in cls_list:
+                mask = labels == tc
+                correct_task += (y_pred[mask, (tc // opt.cls_per_task) * opt.cls_per_task : ((tc // opt.cls_per_task)+1) * opt.cls_per_task].argmax(1) == (tc % opt.cls_per_task)).float().sum()
+
+            for c in cls_list:
+                mask = labels == c
+                corr[c] += correct_all[mask].float().sum().item()
+                cnt[c] += mask.float().sum().item()
+
+            if idx % opt.print_freq == 0:
+                print('Test: [{0}/{1}]\t'
+                      'Acc@1 {top1:.3f} {task_il:.3f}'.format(
+                          idx, len(val_loader),top1=np.sum(corr)/np.sum(cnt)*100., task_il=correct_task/np.sum(cnt)*100.
+                      ))
+    print(' * Acc@1 {top1:.3f} {task_il:.3f}'.format(top1=np.sum(corr)/np.sum(cnt)*100., task_il=correct_task/np.sum(cnt)*100.))
+    
+            
+    classil_acc = np.sum(corr)/np.sum(cnt)*100.
+    taskil_acc = correct_task/np.sum(cnt)*100.
+    return classil_acc, taskil_acc
