@@ -3,7 +3,8 @@ import copy
 
 import torch.optim.lr_scheduler as lr_scheduler
 
-from trains.train_er import train_er, val_er, ncm_er
+# from survey.CIL.dataloaders.dataloader_er import set_taskil_valloader_er_cifar10
+from trains.train_er import train_er, val_er, ncm_er, taskil_val_er
 from trains.train_co2l import ncm_co2l, train_co2l, val_co2l
 from trains.train_gpm import train_gpm_first, train_gpm_other, val_gpm, ncm_gpm
 from trains.train_lucir import train_lucir, val_lucir, ncm_lucir
@@ -21,6 +22,7 @@ def train(opt, model, model2, criterion, optimizer, scheduler, dataloader, epoch
     linear_loader = dataloader["linear"]
     vanilla_loader = dataloader["vanilla"]
     ncm_loader = dataloader["ncm"]
+    taskil_loaders = dataloader["taskil"]
 
     
     if opt.method == "er":
@@ -30,20 +32,32 @@ def train(opt, model, model2, criterion, optimizer, scheduler, dataloader, epoch
                                          optimizer, scheduler, train_loader, val_loader, epoch)
         ncm_acc = ncm_er(model, ncm_loader, val_loader)
 
+        all_task_accuracies, all_task_losses = taskil_val_er(opt, model, criterion, taskil_loaders)
+        # 各タスクの精度を「task0 acc=100.00, task1 acc=90.00」の形式で整形
+        taskil_acc_str = ', '.join([f"task{i} acc={acc:.2f}" for i, acc in enumerate(all_task_accuracies)])
+
+        print("all_task_accuracies: ", all_task_accuracies)
         logger.info(f"task {opt.target_task} Epoch {epoch}: train_loss={loss:.4f}, \
-                    ClassIL_accuracy={classil_acc:.3f}, TaskIL_accuracy={taskil_acc:.3f}, NCM_accuracy={ncm_acc:.3f}")
-    
+                    ClassIL_accuracy={classil_acc:.3f}, TaskIL_accuracy={taskil_acc:.3f}, NCM_accuracy={ncm_acc:.3f}, \
+                    {taskil_acc_str}")
+
+
+
     elif opt.method == "co2l":
         
         loss, model2 = train_co2l(opt=opt, model=model, model2=model2,
                                   criterion=criterion, optimizer=optimizer,
                                   scheduler=scheduler, train_loader=train_loader, epoch=epoch)
         if epoch % 50 == 0:
-            classil_acc, taskil_acc = val_co2l(opt, model, model2, linear_loader, val_loader, epoch)
+            classil_acc, taskil_acc, all_task_accuracies, all_task_losses = val_co2l(opt, model, model2, linear_loader, val_loader, taskil_loaders, epoch)
+            # 各タスクの精度を「task0 acc=100.00, task1 acc=90.00」の形式で整形
+            taskil_acc_str = ', '.join([f"task{i} acc={acc:.2f}" for i, acc in enumerate(all_task_accuracies)])
+
             ncm_acc = ncm_co2l(model, ncm_loader, val_loader)
 
             logger.info(f"task {opt.target_task} Epoch {epoch}: train_loss={loss:.4f}, \
-                        ClassIL_accuracy={classil_acc:.3f}, TaskIL_accuracy={taskil_acc:.3f}, NCM_accuracy={ncm_acc:.3f}")
+                        ClassIL_accuracy={classil_acc:.3f}, TaskIL_accuracy={taskil_acc:.3f}, NCM_accuracy={ncm_acc:.3f}, \
+                        {taskil_acc_str}")
     
     elif opt.method == "gpm":
 
@@ -56,8 +70,13 @@ def train(opt, model, model2, criterion, optimizer, scheduler, dataloader, epoch
         classil_acc, taskil_acc = val_gpm(opt, model, criterion, optimizer, scheduler, train_loader, val_loader, epoch)
         ncm_acc = ncm_gpm(model, ncm_loader, val_loader)
 
+        all_task_accuracies, all_task_losses = taskil_val_er(opt, model, criterion, taskil_loaders)
+        # 各タスクの精度を「task0 acc=100.00, task1 acc=90.00」の形式で整形
+        taskil_acc_str = ', '.join([f"task{i} acc={acc:.2f}" for i, acc in enumerate(all_task_accuracies)])
+
         logger.info(f"task {opt.target_task} Epoch {epoch}: train_loss={loss:.4f}, \
-                    ClassIL_accuracy={classil_acc:.3f}, TaskIL_accuracy={taskil_acc:.3f}, NCM_accuracy={ncm_acc:.3f}")
+                    ClassIL_accuracy={classil_acc:.3f}, TaskIL_accuracy={taskil_acc:.3f}, NCM_accuracy={ncm_acc:.3f}, \
+                    {taskil_acc_str}")
 
     elif opt.method == "lucir":
 
@@ -74,13 +93,25 @@ def train(opt, model, model2, criterion, optimizer, scheduler, dataloader, epoch
     
     elif opt.method == "fs-dgpm":
         
-        train_fsdgpm(opt, model, model2, criterion, optimizer, scheduler, train_loader, epoch)
+        loss = train_fsdgpm(opt, model, model2, criterion, optimizer, scheduler, train_loader, epoch)
 
         if opt.earlystop:
             assert False
         
         classil_acc, taskil_acc = val_fsdgpm(opt, model, model2, criterion, optimizer, scheduler, train_loader, val_loader, epoch)
+        # logger.info(f"task {opt.target_task} Epoch {epoch}: train_loss={loss:.4f}, \
+        #             ClassIL_accuracy={classil_acc:.3f}, TaskIL_accuracy={taskil_acc:.3f}, NCM_accuracy={ncm_acc:.3f}")
         
+        all_task_accuracies, all_task_losses = taskil_val_er(opt, model, criterion, taskil_loaders)
+        # 各タスクの精度を「task0 acc=100.00, task1 acc=90.00」の形式で整形
+        taskil_acc_str = ', '.join([f"task{i} acc={acc:.2f}" for i, acc in enumerate(all_task_accuracies)])
+        
+        logger.info(f"task {opt.target_task} Epoch {epoch}: train_loss={loss:.4f}, \
+                    ClassIL_accuracy={classil_acc:.3f}, TaskIL_accuracy={taskil_acc:.3f}, \
+                    {taskil_acc_str}")
+
+        
+
         # assert False
 
 

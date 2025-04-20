@@ -1,8 +1,17 @@
 
 
 
+from scipy import optimize
+import torch.optim as optim
 
-def preprocess_fsdgpm(opt, model):
+
+
+def preprocess_fsdgpm(opt, model, method_tools):
+
+    optimizer = optim.SGD(model.parameters(),
+                          lr=opt.learning_rate,
+                          momentum=opt.momentum,
+                          weight_decay=opt.weight_decay)
 
     model.eta1 = opt.eta1
 
@@ -13,6 +22,6 @@ def preprocess_fsdgpm(opt, model):
         model.update_opt_lambda(model.eta2)
 
 
+    method_tools['optimizer'] = optimizer
 
-
-    return model
+    return model, method_tools

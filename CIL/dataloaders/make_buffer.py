@@ -57,6 +57,14 @@ def set_buffer(opt, model, prev_indices=None):
 
     elif opt.method == "fs-dgpm":
         replay_indices = []
+
+
+    elif opt.method == "cclis":
+
+        assert False
+    
+    else:
+        assert False
     
 
     

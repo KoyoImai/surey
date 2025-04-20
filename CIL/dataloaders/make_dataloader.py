@@ -7,6 +7,7 @@ from dataloaders.dataloader_er import set_loader_er_cifar100, set_valloader_er_c
 from dataloaders.dataloader_er import set_loader_er_tinyimagenet, set_valloader_er_tinyimagenet
 from dataloaders.dataloader_er import set_vanillaloader_er_cifar10, set_vanillaloader_er_cifar100, set_vanillaloader_er_tinyimagenet
 from dataloaders.dataloader_er import set_ncmloader_er_cifar10, set_ncmloader_er_cifar100, set_ncmloader_er_tinyimagenet
+from dataloaders.dataloader_er import set_taskil_valloader_er_cifar10, set_taskil_valloader_er_cifar100, set_taskil_valloader_er_tinyimagenet
 
 # co2l
 from dataloaders.dataloader_co2l import set_loader_co2l_cifar10, set_linearloader_co2l_cifar10, set_valloader_co2l_cifar10
@@ -156,5 +157,14 @@ def set_loader(opt, replay_indices):
         ncm_loader, _ = set_ncmloader_er_tinyimagenet(opt=opt, normalize=normalize, replay_indices=replay_indices)
 
 
-    dataloader = {"train": train_loader, "linear": linear_loader, "val": val_loader, "vanilla": vanilla_loader, "ncm": ncm_loader}
+    # タスク増加シナリオにおける評価を行うためのデータローダ
+    if opt.dataset == "cifar10":
+        taskil_loaders = set_taskil_valloader_er_cifar10(opt=opt, normalize=normalize)
+    elif opt.dataset == "cifar100":
+        taskil_loaders = set_taskil_valloader_er_cifar100(opt=opt, normalize=normalize)
+    elif opt.dataset == "tiny-imagenet":
+        taskil_loaders = set_taskil_valloader_er_tinyimagenet(opt=opt, normalize=normalize)
+
+    dataloader = {"train": train_loader, "linear": linear_loader, "val": val_loader, "vanilla": vanilla_loader, "ncm": ncm_loader, "taskil": taskil_loaders}
+    
     return dataloader, subset_indices

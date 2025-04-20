@@ -93,7 +93,7 @@ def train_co2l(opt, model, model2, criterion, optimizer, scheduler, train_loader
     return losses.avg, model2
 
 
-def val_co2l(opt, model, model2, linear_loader, val_loader, epoch):
+def val_co2l(opt, model, model2, linear_loader, val_loader, taskil_loaders, epoch):
 
     # classifierの準備
     classifier = LinearClassifier(name="resnet18", num_classes=opt.n_cls, seed=opt.seed)
@@ -152,7 +152,7 @@ def val_co2l(opt, model, model2, linear_loader, val_loader, epoch):
                       epoch, idx + 1, len(linear_loader), loss=losses))
 
 
-        # 検証
+        # 検証（これまでの全てのタスクを使用）
         model.eval()
         classifier.eval()
 
@@ -204,9 +204,79 @@ def val_co2l(opt, model, model2, linear_loader, val_loader, epoch):
         # 学習率の調整
         scheduler.step()
 
+    # 検証（これまで学習した各タスク毎に）
+    all_task_accuracies, all_task_losses = taskil_val_co2l(opt, model, classifier, criterion, taskil_loaders)
+
     classil_acc = np.sum(corr)/np.sum(cnt)*100.
     taskil_acc = correct_task/np.sum(cnt)*100.
-    return classil_acc, taskil_acc
+    return classil_acc, taskil_acc, all_task_accuracies, all_task_losses
+
+
+def taskil_val_co2l(opt, model, classifier,  criterion, val_loaders):
+
+    # modelをevalモードに変更
+    model.eval()
+
+    all_task_accuracies = []
+    all_task_losses = []
+
+    for taskid, val_loader in enumerate(val_loaders):
+
+        losses = AverageMeter()
+        correct = 0
+        total = 0
+        task_accuracy = 0
+
+        with torch.no_grad():
+
+            for idx, (images, labels) in enumerate(val_loader):
+
+                images = images.float().cuda()
+                labels = labels.cuda()
+                bsz = labels.shape[0]
+
+                y_pred = classifier(model.encoder(images))
+
+                # 出力のクラス範囲を制限
+                start_class = idx * opt.cls_per_task
+                end_class = (idx+1) * opt.cls_per_task
+                y_task = y_pred[:, start_class:end_class]
+
+                loss = criterion(y_pred, labels)
+
+                losses.update(loss.item(), bsz)
+
+                # ===== TaskILの正解数をカウント =====
+                cls_per_task = opt.cls_per_task  # 例: 10
+                correct_batch = 0
+
+                unique_classes = torch.unique(labels)
+                for cls in unique_classes:
+                    cls = cls.item()
+                    task_idx = cls // cls_per_task
+                    start = task_idx * cls_per_task
+                    end = start + cls_per_task
+
+                    # 現クラスのサンプルだけを抽出
+                    mask = (labels == cls)
+                    masked_preds = y_pred[mask, start:end]   # 該当タスク範囲のみの出力
+                    pred_classes = masked_preds.argmax(1)    # 該当範囲内でargmax → [0~9]
+                    true_classes = cls % cls_per_task        # 対応する正解ラベル → 0~9
+
+                    correct_batch += (pred_classes == true_classes).sum().item()
+
+                correct += correct_batch
+                total += bsz
+            
+        # タスクごとの精度と損失を保存
+        task_accuracy = 100.0 * correct / total
+        all_task_accuracies.append(task_accuracy)
+        all_task_losses.append(losses.avg)
+
+        print(f"[Task {taskid}] Loss: {losses.avg:.4f}, Accuracy: {task_accuracy:.2f}%")
+
+    return all_task_accuracies, all_task_losses
+
 
 
 

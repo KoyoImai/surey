@@ -195,9 +195,112 @@ def ncm_er(model, ncm_loader, val_loader):
     return ncm_acc
 
 
+def taskil_val_er(opt, model, criterion, val_loaders):
+
+    # modelをevalモードに変更
+    model.eval()
+
+    all_task_accuracies = []
+    all_task_losses = []
+
+    for taskid, val_loader in enumerate(val_loaders):
+
+        losses = AverageMeter()
+        correct = 0
+        total = 0
+        task_accuracy = 0
+
+        with torch.no_grad():
+
+            for idx, (images, labels) in enumerate(val_loader):
+
+                images = images.float().cuda()
+                labels = labels.cuda()
+                bsz = labels.shape[0]
+
+                y_pred = model(images)
+
+                # 出力のクラス範囲を制限
+                start_class = idx * opt.cls_per_task
+                end_class = (idx+1) * opt.cls_per_task
+                y_task = y_pred[:, start_class:end_class]
+
+                loss = criterion(y_pred, labels)
+
+                losses.update(loss.item(), bsz)
+
+                # ===== TaskILの正解数をカウント =====
+                cls_per_task = opt.cls_per_task  # 例: 10
+                correct_batch = 0
+
+                unique_classes = torch.unique(labels)
+                for cls in unique_classes:
+                    cls = cls.item()
+                    task_idx = cls // cls_per_task
+                    start = task_idx * cls_per_task
+                    end = start + cls_per_task
+
+                    # 現クラスのサンプルだけを抽出
+                    mask = (labels == cls)
+                    masked_preds = y_pred[mask, start:end]   # 該当タスク範囲のみの出力
+                    pred_classes = masked_preds.argmax(1)    # 該当範囲内でargmax → [0~9]
+                    true_classes = cls % cls_per_task        # 対応する正解ラベル → 0~9
+
+                    correct_batch += (pred_classes == true_classes).sum().item()
+
+                correct += correct_batch
+                total += bsz
+            
+        # タスクごとの精度と損失を保存
+        task_accuracy = 100.0 * correct / total
+        all_task_accuracies.append(task_accuracy)
+        all_task_losses.append(losses.avg)
+
+        print(f"[Task {taskid}] Loss: {losses.avg:.4f}, Accuracy: {task_accuracy:.2f}%")
+
+    return all_task_accuracies, all_task_losses
 
 
+# 出力範囲を制限せずに精度を測っているので，厳密にはtaskilの精度測定ではない
+# def taskil_val_er(opt, model, criterion, val_loaders):
 
+#     # modelをevalモードに変更
+#     model.eval()
 
+#     all_task_accuracies = []
+#     all_task_losses = []
 
+#     for taskid, val_loader in enumerate(val_loaders):
+
+#         losses = AverageMeter()
+#         correct = 0
+#         total = 0
+#         task_accuracy = 0
+
+#         with torch.no_grad():
+
+#             for idx, (images, labels) in enumerate(val_loader):
+
+#                 images = images.float().cuda()
+#                 labels = labels.cuda()
+#                 bsz = labels.shape[0]
+
+#                 y_pred = model(images)
+#                 loss = criterion(y_pred, labels)
+
+#                 losses.update(loss.item(), bsz)
+
+#                 # 正解予測数カウント
+#                 preds = y_pred.argmax(1)
+#                 correct += (preds == labels).sum().item()
+#                 total += bsz
+            
+#         # タスクごとの精度と損失を保存
+#         task_accuracy = 100.0 * correct / total
+#         all_task_accuracies.append(task_accuracy)
+#         all_task_losses.append(losses.avg)
+
+#         print(f"[Task {taskid}] Loss: {losses.avg:.4f}, Accuracy: {task_accuracy:.2f}%")
+
+#     return all_task_accuracies, all_task_losses
 

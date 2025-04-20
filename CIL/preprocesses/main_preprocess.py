@@ -15,7 +15,7 @@ def pre_process(opt, model, model2,  dataloader, method_tools):
         method_tools, model, model2 = preprocess_lucir(opt=opt, model=model, model2=model2, method_tools=method_tools)
         return method_tools, model, model2
     elif opt.method in ["fs-dgpm"]:
-        model = preprocess_fsdgpm(opt, model)
+        model, method_tools = preprocess_fsdgpm(opt, model, method_tools)
         return method_tools, model, model2
     else:
         assert False

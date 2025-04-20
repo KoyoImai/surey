@@ -114,17 +114,25 @@ def train_fsdgpm(opt, model, model2, criterion, optimizer, scheduler, train_load
         else:
             optimizer.step()
         
+        scheduler.step()
+        
         # update metric
         losses.update(loss.item(), bsz)
-        
+
+        # 現在の学習率
+        current_lr = optimizer.param_groups[0]['lr']
+
         # 学習記録の表示
         if (idx+1) % opt.print_freq == 0 or idx+1 == len(train_loader):
             print('Train: [{0}][{1}/{2}]\t'
-                  'loss {loss.val:.3f} ({loss.avg:.3f})'.format(
-                   epoch, idx + 1, len(train_loader), loss=losses))
+                  'loss {loss.val:.3f} ({loss.avg:.3f})\t'
+                  'lr {lr:.5f}'.format(
+                   epoch, idx + 1, len(train_loader), loss=losses, lr=current_lr))
 
         if epoch == 1:
             model.push_to_mem(images, labels, torch.tensor(opt.target_task), epoch)
+    
+    return losses.avg
 
 
 
@@ -177,3 +185,96 @@ def val_fsdgpm(opt, model, model2, criterion, optimizer, scheduler, train_loader
     classil_acc = np.sum(corr)/np.sum(cnt)*100.
     taskil_acc = correct_task/np.sum(cnt)*100.
     return classil_acc, taskil_acc
+
+
+
+
+def ncm_er(model, ncm_loader, val_loader):
+
+    # modelを評価モードに変更
+    model.eval()
+
+    # 訓練用（ncm_loader）データから全サンプルの特徴とラベルを集めるリスト
+    all_features = []
+    all_labels = []
+
+    # 平均特徴の計算
+    with torch.no_grad():
+        for idx, (images, labels) in enumerate(ncm_loader):
+
+            # gpu上に配置
+            if torch.cuda.is_available():
+                images = images.cuda(non_blocking=True)
+                labels = labels.cuda(non_blocking=True)
+            
+            # modelにデータを入力
+            y_pred, features = model(x=images, return_feat=True)
+
+            # 特徴量とラベルを保存
+            all_features.append(features.cpu())
+            all_labels.append(labels.cpu())
+            
+    
+    # リスト内のテンソルを連結
+    all_features = torch.cat(all_features, dim=0)  # shape: [N, feature_dim]
+    all_labels = torch.cat(all_labels, dim=0)
+
+    unique_labels = torch.unique(all_labels)
+    class_means = {}  # {クラスラベル: 平均特徴}
+    
+    
+    # 保存してある特徴とラベルをもとに各クラスの平均を計算
+    for label in unique_labels:
+        
+        # 該当クラスのサンプルインデックスを抽出
+        idxs = (all_labels == label)
+        feats = all_features[idxs]
+        
+        # サンプルごとに特徴を平均
+        mean_feat = feats.mean(dim=0, keepdim=True)  # shape: [1, feature_dim]
+        class_means[int(label.item())] = mean_feat
+    
+
+    # 辞書のキー（ラベル）が昇順になるようにソートし，平均特徴量を一つのテンソルに変換
+    sorted_labels = sorted(class_means.keys())
+    means_list = [class_means[l] for l in sorted_labels]
+    class_means_tensor = torch.cat(means_list, dim=0)  # shape: [num_classes, feature_dim]
+    print("Computed class means for {} classes.".format(class_means_tensor.shape[0]))
+
+    
+    # 検証用データの特徴と各クラスの平均特徴を比較し，最も近いクラスに分類する
+    total = 0
+    correct = 0
+    with torch.no_grad():
+        for idx, (images, labels) in enumerate(val_loader):
+            
+            # gpu上に配置
+            if torch.cuda.is_available():
+                images = images.cuda(non_blocking=True)
+                labels = labels.cuda(non_blocking=True)
+            
+            # モデルに検証データを入力して特徴を取得
+            y_pred, features = model(x=images, return_feat=True)
+
+            # バッチ内の各サンプル特徴を正規化
+            features_norm = F.normalize(features, p=2, dim=1)
+
+            # クラス平均も同様に正規化（デバイス変換も行う）
+            class_means_norm = F.normalize(class_means_tensor.to(features.device), p=2, dim=1)
+
+            # 各サンプルと全クラス平均間のコサイン類似度を計算（内積）
+            # shape: [batch_size, num_classes]
+            cos_sim = torch.mm(features_norm, class_means_norm.t())
+
+            # 各サンプルについて、最も類似度が高いクラス（＝予測ラベル）を求める
+            pred_labels = cos_sim.argmax(dim=1)
+            
+            total += labels.size(0)
+            correct += (pred_labels == labels).sum().item()
+    
+    ncm_acc = correct / total * 100
+    # print("NCM Classification Accuracy: {:.2f}%".format(ncm_acc))
+
+
+    return ncm_acc
+

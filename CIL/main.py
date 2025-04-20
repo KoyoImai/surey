@@ -27,7 +27,7 @@ def parse_option():
 
     # 手法
     parser.add_argument('--method', type=str, default="",
-                        choices=['er', 'co2l', 'gpm', 'lucir', 'fs-dgpm'])
+                        choices=['er', 'co2l', 'gpm', 'lucir', 'fs-dgpm', 'cclis'])
 
     # logの名前（実行毎に変えてね）
     parser.add_argument('--log_name', type=str, default="practice")
@@ -150,9 +150,9 @@ def preparation(opt):
     # モデルの保存，実験記録などの保存先パス
     if opt.data_folder is None:
         opt.data_folder = '~/data/'
-    opt.model_path = f'./logs/{opt.method}/{opt.log_name}/model/'
-    opt.explog_path = f'./logs/{opt.method}/{opt.log_name}/exp_log/'
-    opt.mem_path = f'./logs/{opt.method}/{opt.log_name}/mem_log/'
+    opt.model_path = f'./logs/{opt.method}/{opt.log_name}/model/'      # modelの保存先
+    opt.explog_path = f'./logs/{opt.method}/{opt.log_name}/exp_log/'   # 実験記録の保存先
+    opt.mem_path = f'./logs/{opt.method}/{opt.log_name}/mem_log/'      # リプレイバッファ内の保存先
 
     # ディレクトリ作成
     if not os.path.isdir(opt.model_path):
@@ -198,7 +198,7 @@ def make_setup(opt):
         
         model = SupConResNet(name='resnet18', head='mlp', feat_dim=128, seed=opt.seed)
         model2 = SupConResNet(name='resnet18', head='mlp', feat_dim=128, seed=opt.seed)
-        criterion = SupConLoss(temperature=0.07)
+        criterion = SupConLoss(temperature=opt.temp)
         optimizer = optim.SGD(model.parameters(),
                                 lr=opt.learning_rate,
                                 momentum=opt.momentum,
@@ -279,6 +279,26 @@ def make_setup(opt):
                                 weight_decay=opt.weight_decay)
         assert False
 
+    elif opt.method == "cclis":
+
+        from losses.loss_cclis import ISSupConLoss
+
+        if opt.dataset in ["cifar10", "cifar100", "tiny-imagenet"]:
+            from models.resnet_cifar_cclis import SupConResNet
+        elif opt.dataset in ["imagemet"]:
+            assert False
+        
+        model = SupConResNet(name='resnet18', head='mlp', feat_dim=128, seed=opt.seed)
+        model2 = SupConResNet(name='resnet18', head='mlp', feat_dim=128, seed=opt.seed)
+        criterion = ISSupConLoss(temperature=opt.temp, opt=opt)
+
+        optimizer = optim.SGD(model.parameters(),
+                                lr=opt.learning_rate,
+                                momentum=opt.momentum,
+                                weight_decay=opt.weight_decay)
+        method_tools = {"optimizer": optimizer}
+
+
     else:
         assert False
 
@@ -308,7 +328,11 @@ def make_scheduler(opt, epochs, dataloader, method_tools):
     elif opt.method == "lucir":
         scheduler = lr_scheduler.MultiStepLR(optimizer, milestones=[80, 120], gamma=0.1)
     elif opt.method in ["fs-dgpm"]:
-        scheduler = None
+        total_steps = epochs * len(dataloader)
+        if opt.target_task == 0:
+            scheduler = lr_scheduler.OneCycleLR(optimizer, max_lr=opt.learning_rate, total_steps=total_steps, pct_start=0.1, anneal_strategy='cos')
+        else:
+            scheduler = lr_scheduler.OneCycleLR(optimizer, max_lr=opt.learning_rate, total_steps=total_steps, pct_start=0.1, anneal_strategy='cos')
     else:
         assert False
 

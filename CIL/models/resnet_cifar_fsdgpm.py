@@ -211,8 +211,13 @@ class ResNet(nn.Module):
 
     def forward(self, x, return_feat=False):
         bsz = x.size(0)
-        self.act['conv_in'] = x.view(bsz, 3, 32, 32)
-        out = relu(self.bn1(self.conv1(x.view(bsz, 3, 32, 32)))) 
+
+        # self.act['conv_in'] = x.view(bsz, 3, 32, 32)
+        # out = relu(self.bn1(self.conv1(x.view(bsz, 3, 32, 32)))) 
+
+        self.act['conv_in'] = x.view(bsz, 3, 64, 64)
+        out = relu(self.bn1(self.conv1(x.view(bsz, 3, 64, 64))))
+        
         out = self.layer1(out)
         out = self.layer2(out)
         out = self.layer3(out)
@@ -395,17 +400,18 @@ class ResNet(nn.Module):
             # print("y[16].shape: ", y[16].shape)   # y[16].shape:  torch.Size([2000, 4608])
             # print("y[17].shape: ", y[17].shape)   # y[17].shape:  torch.Size([2000, 256])
 
-            out = self.svd_block_forward(self.layer4[1], out, y)
-            # print("out.shape: ", out.shape)       # out.shape:  torch.Size([125, 512, 4, 4])
-            # print("y[18].shape: ", y[18].shape)   # y[18].shape:  torch.Size([2000, 4608])
-            # print("y[19].shape: ", y[19].shape)   # y[19].shape:  torch.Size([2000, 4608])
+            # 2025/04/17にコメントアウト
+            # out = self.svd_block_forward(self.layer4[1], out, y)
+            # # print("out.shape: ", out.shape)       # out.shape:  torch.Size([125, 512, 4, 4])
+            # # print("y[18].shape: ", y[18].shape)   # y[18].shape:  torch.Size([2000, 4608])
+            # # print("y[19].shape: ", y[19].shape)   # y[19].shape:  torch.Size([2000, 4608])
 
-            # avgpool->flatten->fc 入力もパッチにするなら下記など
-            out = self.avgpool(out)
-            # print("out.shape: ", out.shape)   # out.shape:  torch.Size([125, 512, 1, 1])
-            out = out.view(out.size(0), -1)
-            # print("out.shape: ", out.shape)   # out.shape:  torch.Size([125, 512])
-            y.append(out)
+            # # avgpool->flatten->fc 入力もパッチにするなら下記など
+            # out = self.avgpool(out)
+            # # print("out.shape: ", out.shape)   # out.shape:  torch.Size([125, 512, 1, 1])
+            # out = out.view(out.size(0), -1)
+            # # print("out.shape: ", out.shape)   # out.shape:  torch.Size([125, 512])
+            # y.append(out)
 
             print("len(y): ", len(y))
             # Layer 1 : (27, 51200)
