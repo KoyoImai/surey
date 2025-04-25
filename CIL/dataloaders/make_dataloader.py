@@ -1,4 +1,5 @@
 
+from regex import F
 from torchvision import transforms, datasets
 
 # er
@@ -30,10 +31,12 @@ from dataloaders.dataloader_fsdgpm import set_loader_fsdgpm_cifar10, set_valload
 from dataloaders.dataloader_fsdgpm import set_loader_fsdgpm_cifar100, set_valloader_fsdgpm_cifar100
 from dataloaders.dataloader_fsdgpm import set_loader_fsdgpm_tinyimagenet, set_valloader_fsdgpm_tinyimagenet
 
+# cclis
+from dataloaders.dataloader_cclis import set_loader_cclis_cifar10, set_loader_cclis_cifar100, set_loader_cclis_tinyimagenet
 
 
 
-def set_loader(opt, replay_indices):
+def set_loader(opt, replay_indices, method_tools):
 
     if opt.dataset == 'cifar10':
         mean = (0.4914, 0.4822, 0.4465)
@@ -140,6 +143,27 @@ def set_loader(opt, replay_indices):
         else:
             assert False
     
+    elif opt.method == "cclis":
+
+        if opt.dataset == "cifar10":
+            train_loader, subset_indices, subset_sample_num = set_loader_cclis_cifar10(opt=opt, normalize=normalize, replay_indices=replay_indices, method_tools=method_tools)
+            post_loader, _, _ = set_loader_cclis_cifar10(opt=opt, normalize=normalize, replay_indices=replay_indices, method_tools=method_tools, training=False)
+            val_loader = set_valloader_co2l_cifar10(opt=opt, normalize=normalize)
+            linear_loader = set_linearloader_co2l_cifar10(opt=opt, normalize=normalize, replay_indices=replay_indices)
+        elif opt.dataset == "cifar100":
+            train_loader, subset_indices, subset_sample_num = set_loader_cclis_cifar100(opt=opt, normalize=normalize, replay_indices=replay_indices, method_tools=method_tools)
+            post_loader, _, _ = set_loader_cclis_cifar100(opt=opt, normalize=normalize, replay_indices=replay_indices, method_tools=method_tools, training=False)
+            val_loader = set_valloader_co2l_cifar100(opt=opt, normalize=normalize)
+            linear_loader = set_linearloader_co2l_cifar100(opt=opt, normalize=normalize, replay_indices=replay_indices)
+        elif opt.dataset == 'tiny-imagenet':
+            train_loader, subset_indices, subset_sample_num = set_loader_cclis_tinyimagenet(opt=opt, normalize=normalize, replay_indices=replay_indices, method_tools=method_tools)
+            post_loader, _, _ = set_loader_cclis_tinyimagenet(opt=opt, normalize=normalize, replay_indices=replay_indices, method_tools=method_tools, training=False)
+            val_loader = set_valloader_co2l_tinyimagenet(opt=opt, normalize=normalize)
+            linear_loader = set_linearloader_co2l_tinyimagenet(opt=opt, normalize=normalize, replay_indices=replay_indices)
+        
+        method_tools["subset_sample_num"] = subset_sample_num
+        method_tools["post_loader"] = post_loader
+
     else:
         assert False
 
@@ -167,4 +191,4 @@ def set_loader(opt, replay_indices):
 
     dataloader = {"train": train_loader, "linear": linear_loader, "val": val_loader, "vanilla": vanilla_loader, "ncm": ncm_loader, "taskil": taskil_loaders}
     
-    return dataloader, subset_indices
+    return dataloader, subset_indices, method_tools

@@ -1,10 +1,7 @@
 
 
 
-
-
-
-def set_buffer(opt, model, prev_indices=None):
+def set_buffer(opt, model, prev_indices=None, method_tools=None):
 
     # 手法毎にバッファの作成方法を変更
     if opt.method == "er":
@@ -61,8 +58,22 @@ def set_buffer(opt, model, prev_indices=None):
 
     elif opt.method == "cclis":
 
-        assert False
-    
+        from dataloaders.buffer_cclis import set_replay_samples_cclis
+        
+        importance_weight = method_tools["importance_weight"]
+        score = method_tools["score"]
+
+        replay_indices, importance_weight, val_targets = set_replay_samples_cclis(
+            opt, prev_indices=prev_indices, prev_importance_weight=importance_weight, prev_score=score
+        )  # [prev_sample_num] tensor
+        print("replauy_indices: ", replay_indices)
+        # print("importance_weight: ", importance_weight)
+        # print("val_targets: ", val_targets)
+        # print("len(val_targets): ", len(val_targets))
+
+        method_tools["importance_weight"] = importance_weight
+        method_tools["val_targets"] = val_targets
+        
     else:
         assert False
     
@@ -70,7 +81,7 @@ def set_buffer(opt, model, prev_indices=None):
     
 
 
-    return replay_indices
+    return replay_indices, method_tools
 
 
 

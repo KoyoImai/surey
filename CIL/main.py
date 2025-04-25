@@ -13,7 +13,7 @@ from torch.utils.data import Subset, Dataset
 import torch.optim.lr_scheduler as lr_scheduler
 
 
-from util import seed_everything
+from util import seed_everything, save_model
 from dataloaders.make_buffer import set_buffer
 from dataloaders.make_dataloader import set_loader
 from trains.main_train import train
@@ -84,6 +84,12 @@ def parse_option():
     parser.add_argument("--K", type=int, default=2)
     parser.add_argument("--dist", type=float, default=0.5)
     parser.add_argument("--lw_mr", type=float, default=1)
+
+    # 手法毎のハイパラ（cclis）
+    parser.add_argument('--distill_type', type=str, default="PRD")
+    parser.add_argument('--max_iter', type=int, default=5,
+                        help='iterations of the score computing')
+    parser.add_argument('--learning_rate_prototypes', type=float, default=0.01)
 
     # 手法毎のハイパラ（fs-dgpm）
     # parser.add_argument('--inner_batches', type=int, default=2)
@@ -288,16 +294,32 @@ def make_setup(opt):
         elif opt.dataset in ["imagemet"]:
             assert False
         
-        model = SupConResNet(name='resnet18', head='mlp', feat_dim=128, seed=opt.seed)
-        model2 = SupConResNet(name='resnet18', head='mlp', feat_dim=128, seed=opt.seed)
+        model = SupConResNet(name='resnet18', head='mlp', feat_dim=128, seed=opt.seed, opt=opt)
+        model2 = SupConResNet(name='resnet18', head='mlp', feat_dim=128, seed=opt.seed, opt=opt)
         criterion = ISSupConLoss(temperature=opt.temp, opt=opt)
 
-        optimizer = optim.SGD(model.parameters(),
-                                lr=opt.learning_rate,
-                                momentum=opt.momentum,
-                                weight_decay=opt.weight_decay)
-        method_tools = {"optimizer": optimizer}
+        # optimizer = optim.SGD(model.parameters(),
+        #                         lr=opt.learning_rate,
+        #                         momentum=opt.momentum,
+        #                         weight_decay=opt.weight_decay)
 
+        if 'prototypes.weight' in model.state_dict().keys():
+            optimizer = optim.SGD([
+                            {'params': model.encoder.parameters()},
+                            {'params': model.head.parameters()},
+                            {'params': model.prototypes.parameters(), 'lr': opt.learning_rate_prototypes},
+                            ],
+                            lr=opt.learning_rate,
+                            momentum=opt.momentum,
+                            weight_decay=opt.weight_decay)
+        else:
+            learning_rate =  opt.learning_rate
+            optimizer = optim.SGD(model.parameters(),
+                            lr=learning_rate,
+                            momentum=opt.momentum,
+                            weight_decay=opt.weight_decay)
+        method_tools = {"optimizer": optimizer, "importance_weight": None, "score": None,
+                        "score_mask": None, "subset_sample_num": None, "post_loader": None, "val_targets": None}
 
     else:
         assert False
@@ -318,7 +340,7 @@ def make_scheduler(opt, epochs, dataloader, method_tools):
 
     if opt.method in ["er", "gpm"]:
         scheduler = None
-    elif opt.method == "co2l":
+    elif opt.method in ["co2l", "cclis"]:
         print("len(dataloader): ", len(dataloader))
         total_steps = epochs * len(dataloader)
         if opt.target_task == 0:
@@ -375,7 +397,7 @@ def main():
         logging.info('Start Training current task {}'.format(opt.target_task))
 
         # リプレイバッファ内にあるデータのインデックスを獲得
-        replay_indices = set_buffer(opt, model, prev_indices=replay_indices)
+        replay_indices, method_tools = set_buffer(opt, model, prev_indices=replay_indices, method_tools=method_tools)
         # print("main.py replay_indices: ", replay_indices)
 
         # バッファ内データのインデックスを保存（検証や分析時に読み込むため）
@@ -384,7 +406,7 @@ def main():
           np.array(replay_indices))
         
         # データローダーの作成（バッファ内のデータも含めて）
-        dataloader, subset_indices = set_loader(opt, replay_indices)
+        dataloader, subset_indices, method_tools = set_loader(opt, replay_indices, method_tools)
 
         # 検証や分析用にデータを保存
         np.save(
@@ -416,7 +438,11 @@ def main():
                   epoch=epoch, method_tools=method_tools)
             
         # タスク終了後の後処理（gpmなどの後処理が必要な手法のため）
-        method_tools, model2 = post_process(opt=opt, model=model, model2=model2, dataloader=dataloader, method_tools=method_tools)
+        method_tools, model2 = post_process(opt=opt, model=model, model2=model2, dataloader=dataloader, criterion=criterion, method_tools=method_tools, replay_indices=replay_indices)
+
+        # 保存（opt.model_path）
+        file_path = f"{opt.model_path}/model_{opt.target_task:02d}.pth"
+        save_model(model, method_tools["optimizer"], opt, opt.epochs, file_path)
 
     
 

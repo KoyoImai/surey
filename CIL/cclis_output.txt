@@ -1,0 +1,22 @@
+Start Training current task 0
+/home/kouyou/Datasets/
+/home/kouyou/ContinualLearning/survey/CIL
+Files already downloaded and verified
+replauy_indices:  []
+target_classes [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+Files already downloaded and verified
+uc[np.argsort(uk)] [5000 5000 5000 5000 5000 5000 5000 5000 5000 5000]
+target_classes [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+Files already downloaded and verified
+uc[np.argsort(uk)] [5000 5000 5000 5000 5000 5000 5000 5000 5000 5000]
+no separate sampler
+Files already downloaded and verified
+[0 1 2 3 4 5 6 7 8 9]
+[5000 5000 5000 5000 5000 5000 5000 5000 5000 5000]
+[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+Files already downloaded and verified
+[5000 5000 5000 5000 5000 5000 5000 5000 5000 5000]
+[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+Files already downloaded and verified
+[5000 5000 5000 5000 5000 5000 5000 5000 5000 5000]
+len(dataloader):  98
