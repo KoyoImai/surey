@@ -1,6 +1,6 @@
 
 
-export CUDA_VISIBLE_DEVICES="1"
+export CUDA_VISIBLE_DEVICES="2"
 
 
 # cifar10

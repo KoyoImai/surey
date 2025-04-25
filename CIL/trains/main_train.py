@@ -9,6 +9,7 @@ from trains.train_co2l import ncm_co2l, train_co2l, val_co2l
 from trains.train_gpm import train_gpm_first, train_gpm_other, val_gpm, ncm_gpm
 from trains.train_lucir import train_lucir, val_lucir, ncm_lucir
 from trains.train_fsdgpm import train_fsdgpm, val_fsdgpm
+from trains.train_cclis import train_cclis, val_cclis, ncm_cclis
 
 
 logger = logging.getLogger(__name__)
@@ -110,10 +111,25 @@ def train(opt, model, model2, criterion, optimizer, scheduler, dataloader, epoch
                     ClassIL_accuracy={classil_acc:.3f}, TaskIL_accuracy={taskil_acc:.3f}, \
                     {taskil_acc_str}")
 
-        
+    elif opt.method == "cclis":
 
-        # assert False
+        subset_sample_num = method_tools["subset_sample_num"]
+        score_mask = method_tools["score_mask"]
 
+        loss, model2 = train_cclis(opt=opt, model=model, model2=model2,
+                                   criterion=criterion, optimizer=optimizer,
+                                   subset_sample_num=subset_sample_num, score_mask=score_mask,
+                                   scheduler=scheduler, train_loader=train_loader, epoch=epoch)
+        if epoch % 50 == 0:
+            classil_acc, taskil_acc, all_task_accuracies, all_task_losses = val_cclis(opt, model, model2, linear_loader, val_loader, taskil_loaders, epoch)
+            # 各タスクの精度を「task0 acc=100.00, task1 acc=90.00」の形式で整形
+            taskil_acc_str = ', '.join([f"task{i} acc={acc:.2f}" for i, acc in enumerate(all_task_accuracies)])
+
+            ncm_acc = ncm_cclis(model, ncm_loader, val_loader)
+
+            logger.info(f"task {opt.target_task} Epoch {epoch}: train_loss={loss:.4f}, \
+                        ClassIL_accuracy={classil_acc:.3f}, TaskIL_accuracy={taskil_acc:.3f}, NCM_accuracy={ncm_acc:.3f}, \
+                        {taskil_acc_str}")
 
     else:
         assert False
