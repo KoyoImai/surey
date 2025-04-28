@@ -100,11 +100,12 @@ def set_replay_samples_cclis(opt, prev_indices=None, prev_importance_weight=None
     if len(observed_classes) == 0:
         return prev_indices, prev_importance_weight, val_targets
     
-    # 現在観測しているタスクのクラス
+    # 観測直後のタスクのクラス（1タスク前のクラス）
     observed_indices = []
     for tc in observed_classes:
         observed_indices += np.where(val_targets == tc)[0].tolist()
 
+    # ラベルの獲得
     val_observed_targets = val_targets[observed_indices]
     val_unique_cls = np.unique(val_observed_targets)
 
@@ -119,17 +120,22 @@ def set_replay_samples_cclis(opt, prev_indices=None, prev_importance_weight=None
         else:
             size_for_c = math.floor(size_for_c_float)
 
-        # 特定クラスのみを取り出すためのマスク
+        # 特定クラスcのみを取り出すためのマスク
         mask = val_targets[observed_indices] == c
         
         # prev_scoreをもとにサンプル毎に重みづけをして保存するサンプルを選択
         store_index = torch.multinomial(torch.tensor(prev_score[prev_indices_len:])[mask], size_for_c, replacement=False)
 
+        # 選択されたサンプルのインデックスを蓄積
         selected_observed_indices += torch.tensor(observed_indices)[mask][store_index].tolist()
 
+        # 特定クラスcに属する全サンプルのスコアを取り出す（提案分布）
         observed_cur_weight = torch.tensor(prev_score[prev_indices_len:])[mask] 
+        
+        # スコアを正規化
         observed_normalized_weight = observed_cur_weight / observed_cur_weight.sum() 
 
+        # 保存するサンプルのスコアのみを取り出す
         selected_observed_importance_weight += observed_normalized_weight[store_index].tolist()  
 
     print(np.unique(val_targets[selected_observed_indices], return_counts=True))
