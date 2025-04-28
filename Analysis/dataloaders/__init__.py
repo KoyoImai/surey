@@ -27,7 +27,7 @@ def set_loader(opt, replay_indices):
     
     normalize = transforms.Normalize(mean=mean, std=std)
 
-    if opt.method in ["cclis", "er"]:
+    if opt.method in ["cclis", "er", "co2l"]:
         if opt.dataset == "cifar10":
             train_loader, val_laoder = set_loader_cclis_cifar10(opt=opt, normalize=normalize)  # これまでのタスクのサンプルを全て含むデータローダー
             train_loader_2, _ = set_loader_cclis_cifar10_v2(opt=opt, normalize=normalize,
